@@ -4,7 +4,7 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
 export default function Index() {
-  const { isLoading, isAuthenticated, checkAuthStatus } = useAuth();
+  const { isLoading, isAuthenticated, requiresProfileSetup, checkAuthStatus } = useAuth();
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -14,7 +14,11 @@ export default function Index() {
       // Navigate based on authentication status
       const timer = setTimeout(() => {
         if (isAuthenticated) {
-          router.replace("/(tabs)/Home" as any);
+          if (requiresProfileSetup) {
+            router.replace("/auth/profile-setup" as any);
+          } else {
+            router.replace("/(tabs)/Home" as any);
+          }
         } else {
           router.replace("/auth/phone" as any);
         }
@@ -26,7 +30,7 @@ export default function Index() {
     if (!isLoading) {
       initializeApp();
     }
-  }, [isLoading, isAuthenticated]);
+  }, [isLoading, isAuthenticated, requiresProfileSetup]);
 
   // Show loading screen while checking authentication
   return (

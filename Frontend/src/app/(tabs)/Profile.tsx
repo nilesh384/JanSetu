@@ -13,8 +13,10 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { uploadProfileImage } from '../../api/user.js';
 
 interface ProfileOption {
   id: string;
@@ -26,14 +28,19 @@ interface ProfileOption {
 }
 
 export default function Profile() {
-  const { user, logout } = useAuth();
-  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const { user, logout, refreshUser } = useAuth();
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [cameraType, setCameraType] = useState<'front' | 'back'>('front');
   const [flashMode, setFlashMode] = useState<'off' | 'on' | 'auto'>('off');
   const [zoom, setZoom] = useState(0);
+  const [isUpdatingImage, setIsUpdatingImage] = useState(false);
   const cameraRef = useRef<CameraView>(null);
+
+  // Debug: Log user object and profile image URL
+  console.log('🔍 User object:', user);
+  console.log('🖼️ Profile image URL:', user?.profileImageUrl);
+  console.log('🖼️ User ID:', user?.id);
 
   const requestCameraPermission = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
@@ -51,6 +58,33 @@ export default function Profile() {
     }
   };
 
+  const updateProfileImage = async (imageUri: string) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'User not found. Please try logging in again.');
+      return;
+    }
+
+    setIsUpdatingImage(true);
+    
+    try {
+      console.log('📤 Uploading new profile image...');
+      const result = await uploadProfileImage(user.id, imageUri) as any;
+      
+      if (result.success) {
+        // Refresh user data to get the new profile image URL
+        await refreshUser();
+        Alert.alert('Success', 'Profile image updated successfully!');
+      } else {
+        Alert.alert('Error', result.message || 'Failed to upload image. Please try again.');
+      }
+    } catch (error) {
+      console.error('Image upload error:', error);
+      Alert.alert('Error', 'Failed to upload image. Please try again.');
+    } finally {
+      setIsUpdatingImage(false);
+    }
+  };
+
   const takePhoto = async () => {
     if (cameraRef.current) {
       try {
@@ -58,8 +92,8 @@ export default function Profile() {
           quality: 0.8,
           base64: false,
         });
-        setProfileImage(photo.uri);
         setCameraModalVisible(false);
+        await updateProfileImage(photo.uri);
       } catch (error) {
         Alert.alert('Error', 'Failed to take photo. Please try again.');
       }
@@ -111,7 +145,7 @@ export default function Profile() {
     });
 
     if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
+      await updateProfileImage(result.assets[0].uri);
     }
   };
 
@@ -130,7 +164,7 @@ export default function Profile() {
               quality: 0.8,
             }).then(result => {
               if (!result.canceled) {
-                setProfileImage(result.assets[0].uri);
+                updateProfileImage(result.assets[0].uri);
               }
             }).catch(error => {
               Alert.alert('Error', 'Failed to open camera');
@@ -149,7 +183,7 @@ export default function Profile() {
   const profileOptions: ProfileOption[] = [
     {
       id: 'personal',
-      title: 'Personal Information',
+      title: 'Edit Personal Information',
       subtitle: 'Update your name, email, and contact details',
       icon: 'person-outline',
       iconType: 'Ionicons',
@@ -262,40 +296,54 @@ export default function Profile() {
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              {profileImage ? (
-                <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+              {user?.profileImageUrl ? (
+                <Image 
+                  source={{ uri: user.profileImageUrl }} 
+                  style={styles.avatarImage}
+                  onError={(error) => console.log('❌ Image load error:', error)}
+                  onLoad={() => console.log('✅ Image loaded successfully')}
+                />
               ) : (
                 <Ionicons name="person" size={40} color="#666666" />
               )}
+              {isUpdatingImage && (
+                <View style={styles.imageLoadingOverlay}>
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                </View>
+              )}
             </View>
-            <TouchableOpacity style={styles.editAvatarButton} onPress={showImageOptions}>
+            <TouchableOpacity 
+              style={styles.editAvatarButton} 
+              onPress={showImageOptions}
+              disabled={isUpdatingImage}
+            >
               <Ionicons name="camera" size={16} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.phoneNumber || 'User'}</Text>
-            <Text style={styles.userEmail}>john.doe@example.com</Text>
-            <Text style={styles.userLocation}>Delhi, India</Text>
+            <Text style={styles.userName}>{user?.fullName || user?.phoneNumber || 'User'}</Text>
+            <Text style={styles.userEmail}>{user?.email || 'No email provided'}</Text>
+            <Text style={styles.userLocation}>{user?.phoneNumber || 'Phone not available'}</Text>
           </View>
         </View>
 
         {/* Statistics Cards */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>12</Text>
+            <Text style={styles.statNumber}>{user?.totalReports || 0}</Text>
             <Text style={styles.statLabel}>Complaints</Text>
             <Text style={styles.statSubLabel}>Submitted</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statNumber}>8</Text>
+            <Text style={styles.statNumber}>{user?.resolvedReports || 0}</Text>
             <Text style={styles.statLabel}>Resolved</Text>
-            <Text style={styles.statSubLabel}>This Month</Text>
+            <Text style={styles.statSubLabel}>Total</Text>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>4</Text>
-            <Text style={styles.statLabel}>In Progress</Text>
+          {/* <View style={styles.statCard}>
+            <Text style={styles.statNumber}>{(user?.totalReports || 0) - (user?.resolvedReports || 0)}</Text>
+            <Text style={styles.statLabel}>Pending</Text>
             <Text style={styles.statSubLabel}>Active</Text>
-          </View>
+          </View> */}
         </View>
 
         {/* Settings Options */}
@@ -718,5 +766,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
+  },
+  imageLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -62,10 +62,13 @@ export const sendOTP = async (phoneNumber) => {
  * Verify OTP for a phone number
  * @param {string} phoneNumber - 10-digit phone number
  * @param {string} otp - 6-digit OTP
- * @returns {Promise<Object>} Response object with success status and message
+ * @returns {Promise<Object>} Response object with success status, message, and user data
  */
 export const verifyOTP = async (phoneNumber, otp) => {
   try {
+    console.log('🔍 Verifying OTP for:', phoneNumber);
+    console.log('📡 API URL:', `${API_BASE_URL}/otp/verify`);
+    
     const response = await fetch(`${API_BASE_URL}/otp/verify`, {
       method: 'POST',
       headers: {
@@ -77,7 +80,9 @@ export const verifyOTP = async (phoneNumber, otp) => {
       }),
     });
 
+    console.log('📥 Verify response status:', response.status);
     const data = await response.json();
+    console.log('📄 Verify response data:', data);
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to verify OTP');
@@ -85,11 +90,15 @@ export const verifyOTP = async (phoneNumber, otp) => {
 
     return {
       success: true,
-      message: data.message
+      message: data.message,
+      user: data.user || null,
+      isNewUser: data.isNewUser || false,
+      requiresProfileSetup: data.requiresProfileSetup || false,
+      warning: data.warning || null
     };
 
   } catch (error) {
-    console.error('Error verifying OTP:', error);
+    console.error('❌ Error verifying OTP:', error);
     return {
       success: false,
       message: error.message || 'Network error. Please check your connection.',
