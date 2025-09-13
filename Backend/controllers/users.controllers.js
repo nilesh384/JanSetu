@@ -1,155 +1,437 @@
 import dbConnect from "../db/dbConnect.js";
+import crypto from "crypto";
+import { uploadOnCloudinary, deleteOnCloudinary, extractPublicIdFromUrl } from "../services/cloudinary.js";
 
-
-const registerUser = (req, res) => {
-    console.log('Request body:', req.body);
-    console.log('Request headers:', req.headers);
-    
+// Create or login user after OTP verification
+const createOrLoginUser = async (req, res) => {
     try {
-        const {id, name, age} = req.body;
+        const { phoneNumber } = req.body;
         
-        if (!id || !name || !age) {
-            return res.status(400).json({ 
+        if (!phoneNumber) {
+            return res.status(400).json({
                 success: false,
-                message: "Missing required fields: id, name, and age are required",
-                received: req.body
+                message: "Phone number is required"
             });
         }
 
-        const registerQuery = `INSERT INTO users (id, name, age) VALUES ($1, $2, $3)`;
-
-        dbConnect().then(client => {
-            client.query(registerQuery, [id, name, age], (err, result) => {
-                if (err) {
-                    console.error('Error executing query', err.stack);
-                    res.status(500).json({ 
-                        success: false,
-                        message: 'Database error',
-                        error: err.message 
-                    });
-                } else {
-                    console.log(result);
-                    res.status(200).json({ 
-                        success: true,
-                        message: 'User registered successfully' 
-                    });
-                }
-                client.end();
-            });
-        }).catch(dbErr => {
-            console.error('Database connection error:', dbErr);
-            res.status(500).json({ 
-                success: false,
-                message: 'Database connection failed',
-                error: dbErr.message 
-            });
-        });
+        console.log('🔍 Creating/logging in user with phone:', phoneNumber);
+        
+        const client = await dbConnect();
+        
+        try {
+            // Check if user already exists
+            const checkUserQuery = `SELECT * FROM users WHERE phone_number = $1`;
+            const existingUser = await client.query(checkUserQuery, [phoneNumber]);
+            
+            if (existingUser.rows.length > 0) {
+                // User exists - update last_login and return user data
+                const user = existingUser.rows[0];
+                const updateLoginQuery = `
+                    UPDATE users 
+                    SET last_login = CURRENT_TIMESTAMP, 
+                        updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = $1 
+                    RETURNING *
+                `;
+                const updatedUser = await client.query(updateLoginQuery, [user.id]);
+                const rawUser = updatedUser.rows[0];
+                
+                console.log('✅ Existing user logged in:', user.id);
+                
+                // Map database fields to camelCase
+                const mappedUser = {
+                    id: rawUser.id,
+                    phoneNumber: rawUser.phone_number,
+                    email: rawUser.email,
+                    fullName: rawUser.full_name,
+                    profileImageUrl: rawUser.profile_image_url,
+                    isVerified: rawUser.is_verified,
+                    totalReports: rawUser.total_reports,
+                    resolvedReports: rawUser.resolved_reports,
+                    createdAt: rawUser.created_at,
+                    updatedAt: rawUser.updated_at,
+                    lastLogin: rawUser.last_login
+                };
+                
+                return res.status(200).json({
+                    success: true,
+                    message: 'Login successful',
+                    user: mappedUser,
+                    isNewUser: false,
+                    requiresProfileSetup: !user.full_name || !user.email
+                });
+            } else {
+                // New user - create with UUID and minimal data
+                const insertQuery = `
+                    INSERT INTO users (
+                        phone_number, 
+                        email, 
+                        full_name, 
+                        profile_image_url, 
+                        is_verified,
+                        total_reports,
+                        resolved_reports
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    RETURNING *
+                `;
+                
+                const newUserResult = await client.query(insertQuery, [
+                    phoneNumber,
+                    '', // Empty email initially
+                    '', // Empty full_name initially  
+                    '', // Empty profile_image_url initially
+                    true, // is_verified = true after OTP
+                    0, // total_reports = 0
+                    0  // resolved_reports = 0
+                ]);
+                
+                const newUser = newUserResult.rows[0];
+                console.log('✅ New user created:', newUser.id);
+                
+                // Map snake_case to camelCase for frontend consistency
+                const mappedNewUser = {
+                    ...newUser,
+                    phoneNumber: newUser.phone_number,
+                    fullName: newUser.full_name,
+                    profileImageUrl: newUser.profile_image_url,
+                    isVerified: newUser.is_verified,
+                    totalReports: newUser.total_reports,
+                    resolvedReports: newUser.resolved_reports,
+                    createdAt: newUser.created_at,
+                    updatedAt: newUser.updated_at
+                };
+                
+                return res.status(201).json({
+                    success: true,
+                    message: 'User created successfully',
+                    user: mappedNewUser,
+                    isNewUser: true,
+                    requiresProfileSetup: true
+                });
+            }
+            
+        } finally {
+            client.end();
+        }
+        
     } catch (error) {
-        console.error('Controller error:', error);
-        res.status(500).json({ 
+        console.error('❌ Error in createOrLoginUser:', error);
+        res.status(500).json({
             success: false,
-            message: error.message,
-            errors: [] 
+            message: 'Server error',
+            error: error.message
         });
     }
-}
+};
 
-const loginUser = (req, res) => {
+// Update user profile (called from profile-setup page)
+const updateUserProfile = async (req, res) => {
     try {
-        const {id} = req.params;
+        const { userId, fullName, email, profileImageUrl } = req.body;
+        
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID is required"
+            });
+        }
 
+        console.log('📝 Updating user profile:', userId);
+
+        const client = await dbConnect();
+        
+        try {
+            const updateQuery = `
+                UPDATE users 
+                SET 
+                    full_name = $1,
+                    email = $2,
+                    profile_image_url = $3,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $4
+                RETURNING *
+            `;
+            
+            const result = await client.query(updateQuery, [
+                fullName || '',
+                email || '', 
+                profileImageUrl || '',
+                userId
+            ]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+            
+            console.log('✅ Profile updated successfully:', userId);
+            
+            res.status(200).json({
+                success: true,
+                message: 'Profile updated successfully',
+                user: result.rows[0]
+            });
+            
+        } finally {
+            client.end();
+        }
+        
+    } catch (error) {
+        console.error('❌ Error in updateUserProfile:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+// Get user by ID
+const getUserById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        
         if (!id) {
             return res.status(400).json({
                 success: false,
-                message: "Missing required field: id is required",
-                received: req.params
+                message: "User ID is required"
             });
         }
 
-        const loginQuery = `SELECT * FROM users WHERE id = $1`;
+        console.log('🔍 Fetching user by ID:', id);
 
-        dbConnect().then(client => {
-            client.query(loginQuery, [id], (err, result) => {
-                if (err) {
-                    console.error('Error executing query', err.stack);
-                    res.status(500).json({
-                        success: false,
-                        message: 'Database error',
-                        error: err.message
-                    });
-                } else {
-                    if (result.rows.length > 0) {
-                        res.status(200).json({
-                            success: true,
-                            message: 'Login successful',
-                            user: result.rows[0]
-                        });
-                    } else {
-                        res.status(401).json({
-                            success: false,
-                            message: 'Invalid id'
-                        });
-                    }
-                }
-                client.end();
-            });
-        }).catch(dbErr => {
-            console.error('Database connection error:', dbErr);
-            res.status(500).json({
-                success: false,
-                message: 'Database connection failed',
-                error: dbErr.message
-            });
-        });
-    } catch (error) {
-        console.error('Controller error:', error);
-        res.status(500).json({
-            success: false,
-            message: error.message,
-            errors: []
-        });
-    }
-}
-
-const updateUser = (req, res) => {
-    const { id } = req.params;
-    const { name, age } = req.body;
-
-    if (!id) {
-        return res.status(400).json({
-            success: false,
-            message: "Missing required field: id is required",
-            received: req.params
-        });
-    }
-
-    const updateQuery = `UPDATE users SET name = $1, age = $2 WHERE id = $3`;
-
-    dbConnect().then(client => {
-        client.query(updateQuery, [name, age, id], (err, result) => {
-            if (err) {
-                console.error('Error executing query', err.stack);
-                res.status(500).json({
+        const client = await dbConnect();
+        
+        try {
+            const getUserQuery = `SELECT * FROM users WHERE id = $1`;
+            const result = await client.query(getUserQuery, [id]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({
                     success: false,
-                    message: 'Database error',
-                    error: err.message
-                });
-            } else {
-                res.status(200).json({
-                    success: true,
-                    message: 'User updated successfully'
+                    message: 'User not found'
                 });
             }
+            
+            const user = result.rows[0];
+            console.log('✅ User found:', user.id);
+            
+            // Map database fields to camelCase for frontend consistency
+            const mappedUser = {
+                id: user.id,
+                phoneNumber: user.phone_number,
+                email: user.email,
+                fullName: user.full_name,
+                profileImageUrl: user.profile_image_url,
+                isVerified: user.is_verified,
+                totalReports: user.total_reports,
+                resolvedReports: user.resolved_reports,
+                createdAt: user.created_at,
+                updatedAt: user.updated_at,
+                lastLogin: user.last_login
+            };
+            
+            res.status(200).json({
+                success: true,
+                user: mappedUser,
+                requiresProfileSetup: !user.full_name || !user.email
+            });
+            
+        } finally {
             client.end();
-        });
-    }).catch(dbErr => {
-        console.error('Database connection error:', dbErr);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error in getUserById:', error);
         res.status(500).json({
             success: false,
-            message: 'Database connection failed',
-            error: dbErr.message
+            message: 'Server error',
+            error: error.message
         });
-    });
-}
+    }
+};
 
-export {registerUser, loginUser, updateUser};
+// Get user by phone number
+const getUserByPhone = async (req, res) => {
+    try {
+        const { phoneNumber } = req.params;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "Phone number is required"
+            });
+        }
+
+        console.log('🔍 Fetching user by phone:', phoneNumber);
+
+        const client = await dbConnect();
+        
+        try {
+            const getUserQuery = `SELECT * FROM users WHERE phone_number = $1`;
+            const result = await client.query(getUserQuery, [phoneNumber]);
+            
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+            
+            const user = result.rows[0];
+            console.log('✅ User found by phone:', user.id);
+            
+            res.status(200).json({
+                success: true,
+                user: user,
+                requiresProfileSetup: !user.full_name || !user.email
+            });
+            
+        } finally {
+            client.end();
+        }
+        
+    } catch (error) {
+        console.error('❌ Error in getUserByPhone:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+// Upload profile image to Cloudinary
+const uploadProfileImage = async (req, res) => {
+    try {
+        const { userId } = req.body;
+        
+        if (!userId) {
+            return res.status(400).json({
+                success: false,
+                message: "User ID is required"
+            });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                message: "No image file provided"
+            });
+        }
+
+        console.log('📤 Uploading profile image for user:', userId);
+        console.log('📁 File info:', {
+            filename: req.file.filename,
+            size: req.file.size,
+            mimetype: req.file.mimetype
+        });
+
+        const client = await dbConnect();
+        
+        try {
+            // Check if user exists and get current profile image
+            const getUserQuery = `SELECT * FROM users WHERE id = $1`;
+            const userResult = await client.query(getUserQuery, [userId]);
+            
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const currentUser = userResult.rows[0];
+            
+            // Upload new image to Cloudinary
+            const cloudinaryResponse = await uploadOnCloudinary(req.file.path);
+            
+            if (!cloudinaryResponse) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Failed to upload image to Cloudinary'
+                });
+            }
+
+            console.log('☁️ Image uploaded to Cloudinary:', cloudinaryResponse.secure_url);
+
+            // Delete old profile image from Cloudinary if it exists
+            if (currentUser.profile_image_url && currentUser.profile_image_url.includes('cloudinary')) {
+                try {
+                    const oldPublicId = extractPublicIdFromUrl(currentUser.profile_image_url);
+                    await deleteOnCloudinary(oldPublicId);
+                    console.log('🗑️ Old profile image deleted from Cloudinary');
+                } catch (deleteError) {
+                    console.error('⚠️ Failed to delete old image:', deleteError);
+                    // Don't fail the request if old image deletion fails
+                }
+            }
+
+            // Update user's profile image URL in database
+            const updateQuery = `
+                UPDATE users 
+                SET profile_image_url = $1, updated_at = CURRENT_TIMESTAMP
+                WHERE id = $2
+                RETURNING *
+            `;
+            
+            const result = await client.query(updateQuery, [cloudinaryResponse.secure_url, userId]);
+            const updatedUser = result.rows[0];
+            
+            console.log('✅ Profile image updated in database');
+            
+            res.status(200).json({
+                success: true,
+                message: 'Profile image uploaded successfully',
+                user: updatedUser,
+                imageUrl: cloudinaryResponse.secure_url
+            });
+            
+        } finally {
+            client.end();
+        }
+        
+    } catch (error) {
+        console.error('❌ Error in uploadProfileImage:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error during image upload',
+            error: error.message
+        });
+    }
+};
+
+// Legacy functions (keeping for backward compatibility but updated responses)
+const registerUser = (req, res) => {
+    res.status(410).json({
+        success: false,
+        message: "This endpoint is deprecated. Use /create-or-login instead."
+    });
+};
+
+const loginUser = (req, res) => {
+    res.status(410).json({
+        success: false,
+        message: "This endpoint is deprecated. Use /create-or-login instead."
+    });
+};
+
+const updateUser = (req, res) => {
+    res.status(410).json({
+        success: false,
+        message: "This endpoint is deprecated. Use /update-profile instead."
+    });
+};
+
+export { 
+    createOrLoginUser,
+    updateUserProfile, 
+    getUserById,
+    getUserByPhone,
+    uploadProfileImage,
+    registerUser, 
+    loginUser, 
+    updateUser 
+};

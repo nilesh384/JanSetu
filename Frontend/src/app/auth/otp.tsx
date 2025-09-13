@@ -56,29 +56,59 @@ export default function OTPInput() {
 
     try {
       // Verify OTP with backend (phoneNumber already includes +91)
+      console.log('🚀 Starting OTP verification for:', phoneNumber);
       const result = await verifyOTP(phoneNumber as string, otpValue) as any;
+      console.log('📨 OTP verification result:', result);
       
-      if (result.success) {
-        // Save user session to persistent storage
-        await login(phoneNumber as string);
+      if (result.success && result.user) {
+        console.log('✅ OTP verified successfully, user data received:', result.user);
+        console.log('📋 Profile setup required:', result.requiresProfileSetup);
         
-        Alert.alert(
-          'Success!',
-          'Phone number verified successfully!',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/(tabs)/Home' as any)
-            }
-          ]
-        );
+        // Login user with data from database
+        try {
+          await login(result.user, result.requiresProfileSetup);
+          console.log('🔐 Login successful');
+          
+          const successMessage = result.isNewUser 
+            ? 'Welcome to CrowdSource! Your account has been created.'
+            : 'Welcome back! Phone number verified successfully.';
+          
+          Alert.alert(
+            'Success!',
+            successMessage,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Navigate based on profile completion
+                  console.log('🧭 Navigating based on profile setup:', result.requiresProfileSetup);
+                  if (result.requiresProfileSetup) {
+                    console.log('📝 Going to profile setup');
+                    router.replace('/auth/profile-setup' as any);
+                  } else {
+                    console.log('🏠 Going to home');
+                    router.replace('/(tabs)/Home' as any);
+                  }
+                }
+              }
+            ]
+          );
+        } catch (loginError) {
+          console.error('❌ Login error:', loginError);
+          Alert.alert('Login Error', 'Authentication failed. Please try again.');
+        }
+      } else if (result.success) {
+        console.log('⚠️ OTP verified but no user data:', result);
+        Alert.alert('Warning', result.warning || 'OTP verified but account setup failed. Please try again.');
       } else {
+        console.log('❌ OTP verification failed:', result);
         Alert.alert('Verification Failed', result.message || 'Invalid OTP. Please try again.');
         // Clear OTP inputs on failed verification
         setOtp(['', '', '', '', '', '']);
         inputRefs.current[0]?.focus();
       }
     } catch (error) {
+      console.error('❌ OTP verification error:', error);
       Alert.alert('Error', 'Something went wrong. Please check your internet connection and try again.');
       // Clear OTP inputs on error
       setOtp(['', '', '', '', '', '']);

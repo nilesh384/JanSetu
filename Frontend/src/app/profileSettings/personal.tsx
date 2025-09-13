@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Alert,
     SafeAreaView,
@@ -10,23 +10,83 @@ import {
     TextInput,
     TouchableOpacity,
     View,
+    ActivityIndicator,
 } from 'react-native';
 
-export default function PersonalInfo() {
-  const [formData, setFormData] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john.doe@example.com',
-    phone: '+91 9876543210',
-    address: 'Delhi, India',
-    dateOfBirth: '1990-01-01',
-  });
+import { useAuth } from '@/src/context/AuthContext';
+import { updateUserProfile } from '@/src/api/user';
 
-  const handleSave = () => {
-    // Here you would typically save to backend
-    Alert.alert('Success', 'Personal information updated successfully!');
-    router.back();
-  };
+export default function PersonalInfo() {
+    const { user, logout, refreshUser } = useAuth();
+    const [isLoading, setIsLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        fullName: '',
+        email: '',
+        phoneNumber: '',
+    });
+
+    console.log('Current user:', user);
+
+    // Initialize form data when user data is available
+    useEffect(() => {
+        if (user) {
+            setFormData({
+                fullName: user.fullName || '',
+                email: user.email || '',
+                phoneNumber: user.phoneNumber || '',
+            });
+        }
+    }, [user]);
+
+    const handleSave = async () => {
+        if (!user?.id) {
+            Alert.alert('Error', 'User not found. Please log in again.');
+            return;
+        }
+
+        // Validate required fields
+        if (!formData.fullName.trim()) {
+            Alert.alert('Validation Error', 'Please enter your full name.');
+            return;
+        }
+
+        if (!formData.email.trim()) {
+            Alert.alert('Validation Error', 'Please enter your email address.');
+            return;
+        }
+
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(formData.email)) {
+            Alert.alert('Validation Error', 'Please enter a valid email address.');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            console.log('🔄 Updating user profile...');
+            const result = await updateUserProfile(user.id, {
+                fullName: formData.fullName.trim(),
+                email: formData.email.trim().toLowerCase(),
+                profileImageUrl: user.profileImageUrl // Keep existing profile image
+            }) as any;
+
+            if (result.success) {
+                // Refresh user data in context
+                await refreshUser();
+                Alert.alert('Success', 'Personal information updated successfully!');
+                router.back();
+            } else {
+                Alert.alert('Error', result.message || 'Failed to update profile. Please try again.');
+            }
+        } catch (error) {
+            console.error('❌ Profile update error:', error);
+            Alert.alert('Error', 'Failed to update profile. Please check your connection and try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -57,22 +117,13 @@ export default function PersonalInfo() {
           <Text style={styles.sectionTitle}>Basic Information</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>First Name</Text>
+            <Text style={styles.inputLabel}>Full Name</Text>
             <TextInput
               style={styles.input}
-              value={formData.firstName}
-              onChangeText={(value) => handleInputChange('firstName', value)}
-              placeholder="Enter your first name"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Last Name</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.lastName}
-              onChangeText={(value) => handleInputChange('lastName', value)}
-              placeholder="Enter your last name"
+              value={formData.fullName}
+              onChangeText={(value) => handleInputChange('fullName', value)}
+              placeholder="Enter your full name"
+              editable={!isLoading}
             />
           </View>
 
@@ -85,60 +136,47 @@ export default function PersonalInfo() {
               placeholder="Enter your email"
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!isLoading}
             />
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Phone Number</Text>
             <TextInput
-              style={styles.input}
-              value={formData.phone}
-              onChangeText={(value) => handleInputChange('phone', value)}
-              placeholder="Enter your phone number"
+              style={[styles.input, styles.disabledInput]}
+              value={formData.phoneNumber}
+              placeholder="Phone number (cannot be changed)"
               keyboardType="phone-pad"
+              editable={false}
             />
+            <Text style={styles.inputNote}>
+              Phone number cannot be changed for security reasons
+            </Text>
           </View>
         </View>
-
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Additional Details</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Address</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={formData.address}
-              onChangeText={(value) => handleInputChange('address', value)}
-              placeholder="Enter your address"
-              multiline
-              numberOfLines={3}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Date of Birth</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.dateOfBirth}
-              onChangeText={(value) => handleInputChange('dateOfBirth', value)}
-              placeholder="YYYY-MM-DD"
-            />
-          </View>
-        </View>
-
+        
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.saveButton}
+            style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
             onPress={handleSave}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
-            <Text style={styles.saveButtonText}>Save Changes</Text>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.saveButtonText}>Saving...</Text>
+              </View>
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.cancelButton}
             onPress={() => router.back()}
             activeOpacity={0.8}
+            disabled={isLoading}
           >
             <Text style={styles.cancelButtonText}>Cancel</Text>
           </TouchableOpacity>
@@ -213,6 +251,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333333',
   },
+  disabledInput: {
+    backgroundColor: '#F5F5F5',
+    color: '#999999',
+  },
+  inputNote: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
@@ -227,6 +275,15 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 12,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#FFAB8A',
+    opacity: 0.7,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   saveButtonText: {
     color: '#FFFFFF',
