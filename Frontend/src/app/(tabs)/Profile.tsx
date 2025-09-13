@@ -14,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useAuth } from '../../context/AuthContext';
 
 interface ProfileOption {
   id: string;
@@ -25,6 +26,7 @@ interface ProfileOption {
 }
 
 export default function Profile() {
+  const { user, logout } = useAuth();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
@@ -204,10 +206,13 @@ export default function Profile() {
         { 
           text: 'Logout', 
           style: 'destructive', 
-          onPress: () => {
-            Alert.alert('Logged Out', 'You have been successfully logged out.');
-            // TODO: Implement actual logout logic here
-            // This could include clearing user data, tokens, etc.
+          onPress: async () => {
+            try {
+              await logout();
+              router.replace('/auth/phone' as any);
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            }
           }
         },
       ]
@@ -268,7 +273,7 @@ export default function Profile() {
             </TouchableOpacity>
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>John Doe</Text>
+            <Text style={styles.userName}>{user?.phoneNumber || 'User'}</Text>
             <Text style={styles.userEmail}>john.doe@example.com</Text>
             <Text style={styles.userLocation}>Delhi, India</Text>
           </View>

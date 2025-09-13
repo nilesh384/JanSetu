@@ -1,16 +1,46 @@
 import { useEffect } from "react";
 import { router } from "expo-router";
-import { View } from "react-native";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { useAuth } from "../context/AuthContext";
 
 export default function Index() {
+  const { isLoading, isAuthenticated, checkAuthStatus } = useAuth();
+
   useEffect(() => {
-    // Navigate to Home tab on app load
-    const timer = setTimeout(() => {
-      router.replace("/(tabs)/Home" as any);
-    }, 0);
+    const initializeApp = async () => {
+      // Wait for auth check to complete
+      await checkAuthStatus();
+      
+      // Navigate based on authentication status
+      const timer = setTimeout(() => {
+        if (isAuthenticated) {
+          router.replace("/(tabs)/Home" as any);
+        } else {
+          router.replace("/auth/phone" as any);
+        }
+      }, 100);
 
-    return () => clearTimeout(timer);
-  }, []);
+      return () => clearTimeout(timer);
+    };
 
-  return <View style={{ flex: 1 }} />;
+    if (!isLoading) {
+      initializeApp();
+    }
+  }, [isLoading, isAuthenticated]);
+
+  // Show loading screen while checking authentication
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#FF6B35" />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+  },
+});
