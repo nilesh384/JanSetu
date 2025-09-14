@@ -240,3 +240,39 @@ export const getUserByPhone = async (phoneNumber) => {
     };
   }
 };
+
+export const deleteUser = async (phoneNumber) => {
+  try {
+    console.log('🗑 Deleting user with phone:', phoneNumber);
+    console.log('📡 API URL:', `${API_BASE_URL}/users/delete`);
+
+    const response = await fetch(`${API_BASE_URL}/users/delete`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ phoneNumber }),
+    });
+
+    console.log('📥 Response status:', response.status);
+    const data = await response.json();
+    console.log('📄 Response data:', data);
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to delete user');
+    }
+
+    return {
+      success: true,
+      message: 'User deleted successfully',
+    };
+
+  } catch (error) {
+    console.error('❌ Error deleting user:', error);
+    return {
+      success: false,
+      message: error.message || 'Network error. Please check your connection.',
+      error: error
+    };
+  }
+};

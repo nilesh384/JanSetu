@@ -69,18 +69,7 @@ export default function OTPInput() {
           await login(result.user, result.requiresProfileSetup);
           console.log('🔐 Login successful');
           
-          const successMessage = result.isNewUser 
-            ? 'Welcome to CrowdSource! Your account has been created.'
-            : 'Welcome back! Phone number verified successfully.';
-          
-          Alert.alert(
-            'Success!',
-            successMessage,
-            [
-              {
-                text: 'OK',
-                onPress: () => {
-                  // Navigate based on profile completion
+          // Navigate based on profile completion
                   console.log('🧭 Navigating based on profile setup:', result.requiresProfileSetup);
                   if (result.requiresProfileSetup) {
                     console.log('📝 Going to profile setup');
@@ -89,10 +78,6 @@ export default function OTPInput() {
                     console.log('🏠 Going to home');
                     router.replace('/(tabs)/Home' as any);
                   }
-                }
-              }
-            ]
-          );
         } catch (loginError) {
           console.error('❌ Login error:', loginError);
           Alert.alert('Login Error', 'Authentication failed. Please try again.');

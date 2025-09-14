@@ -35,8 +35,25 @@ export const sendOTP = async (phoneNumber) => {
     });
 
     console.log('📥 Response status:', response.status);
-    const data = await response.json();
-    console.log('📄 Response data:', data);
+    console.log('📄 Response headers:', response.headers);
+    
+    // Check if response has content before trying to parse JSON
+    const responseText = await response.text();
+    console.log('📄 Raw response:', responseText);
+    
+    if (!responseText) {
+      throw new Error('Empty response from server');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error:', parseError);
+      throw new Error('Invalid response format from server');
+    }
+    
+    console.log('📄 Parsed data:', data);
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to send OTP');
@@ -81,8 +98,25 @@ export const verifyOTP = async (phoneNumber, otp) => {
     });
 
     console.log('📥 Verify response status:', response.status);
-    const data = await response.json();
-    console.log('📄 Verify response data:', data);
+    console.log('📄 Verify response headers:', response.headers);
+    
+    // Check if response has content before trying to parse JSON
+    const responseText = await response.text();
+    console.log('📄 Raw verify response:', responseText);
+    
+    if (!responseText) {
+      throw new Error('Empty response from server');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error in verify:', parseError);
+      throw new Error('Invalid response format from server');
+    }
+    
+    console.log('📄 Parsed verify data:', data);
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to verify OTP');
@@ -120,7 +154,23 @@ export const sendTestOTP = async () => {
       },
     });
 
-    const data = await response.json();
+    console.log('📥 Test OTP response status:', response.status);
+    
+    // Check if response has content before trying to parse JSON
+    const responseText = await response.text();
+    console.log('📄 Raw test OTP response:', responseText);
+    
+    if (!responseText) {
+      throw new Error('Empty response from server');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error in test OTP:', parseError);
+      throw new Error('Invalid response format from server');
+    }
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to send test OTP');
@@ -156,7 +206,23 @@ export const getStoredOTPs = async () => {
       },
     });
 
-    const data = await response.json();
+    console.log('📥 Debug OTPs response status:', response.status);
+    
+    // Check if response has content before trying to parse JSON
+    const responseText = await response.text();
+    console.log('📄 Raw debug response:', responseText);
+    
+    if (!responseText) {
+      throw new Error('Empty response from server');
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('❌ JSON parse error in debug OTPs:', parseError);
+      throw new Error('Invalid response format from server');
+    }
 
     if (!response.ok) {
       throw new Error(data.message || 'Failed to get stored OTPs');

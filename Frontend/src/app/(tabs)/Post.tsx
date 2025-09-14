@@ -1,6 +1,7 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import {
@@ -17,6 +18,10 @@ import {
 } from 'react-native';
 
 import { useRouter } from 'expo-router';
+
+import { createReport } from '../../api/report.js';
+import { uploadReportMedia } from '../../api/media';
+import { useAuth } from '@/src/context/AuthContext';
 
 interface LocationData {
   latitude: number;
@@ -43,6 +48,9 @@ const priorityLevels = [
 ];
 
 export default function Post() {
+  const { user } = useAuth();
+  const router = useRouter();
+  
   const [selectedCategory, setSelectedCategory] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('medium');
   const [title, setTitle] = useState('');
@@ -51,6 +59,8 @@ export default function Post() {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   
@@ -63,7 +73,6 @@ export default function Post() {
   const [isPlaying, setIsPlaying] = useState(false);
 
 
-  const router = useRouter();
 
   // Get current location on component mount
   useEffect(() => {
@@ -188,7 +197,7 @@ export default function Post() {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: mediaType === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: true,
-      quality: 0.8,
+      quality: 1.0, // Maximum quality, we'll compress later for images
       allowsMultipleSelection: false,
     };
 
@@ -214,7 +223,7 @@ export default function Post() {
     const options: ImagePicker.ImagePickerOptions = {
       mediaTypes: mediaType === 'image' ? ImagePicker.MediaTypeOptions.Images : ImagePicker.MediaTypeOptions.Videos,
       allowsEditing: true,
-      quality: 0.8,
+      quality: 1.0, // Maximum quality, we'll compress later for images
       allowsMultipleSelection: false,
     };
 
@@ -235,22 +244,57 @@ export default function Post() {
       // Generate unique ID
       const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
       
-      // For images, compress if needed
       let finalUri = uri;
+
+      // For images, compress using expo-image-manipulator (much more efficient)
       if (type === 'image') {
-        const compressedImage = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          allowsEditing: false,
-          quality: 0.7, // Compress to 70% quality
-          allowsMultipleSelection: false,
+        console.log('🔄 Compressing image...');
+        
+        // Get image dimensions first to determine optimal resize strategy
+        const { width, height } = await new Promise<{width: number, height: number}>((resolve) => {
+          Image.getSize(uri, (width, height) => resolve({ width, height }));
         });
-        // Use original URI as compression is handled by ImagePicker options
+        
+        console.log(`📏 Original image size: ${width}x${height}`);
+        
+        // Calculate optimal dimensions while maintaining aspect ratio
+        const maxDimension = 1920;
+        let newWidth = width;
+        let newHeight = height;
+        
+        if (width > maxDimension || height > maxDimension) {
+          const aspectRatio = width / height;
+          if (width > height) {
+            newWidth = maxDimension;
+            newHeight = Math.round(maxDimension / aspectRatio);
+          } else {
+            newHeight = maxDimension;
+            newWidth = Math.round(maxDimension * aspectRatio);
+          }
+        }
+        
+        console.log(`📐 Target size: ${newWidth}x${newHeight}`);
+
+        const manipulatedImage = await ImageManipulator.manipulateAsync(
+          uri,
+          width > maxDimension || height > maxDimension 
+            ? [{ resize: { width: newWidth, height: newHeight } }]
+            : [], // No resize needed if image is already small
+          {
+            compress: 0.8, // 80% quality for better balance
+            format: ImageManipulator.SaveFormat.JPEG,
+            base64: false
+          }
+        );
+        
+        finalUri = manipulatedImage.uri;
+        console.log('✅ Image compressed successfully');
       }
 
       const newMediaItem = { id, uri: finalUri, type };
       setMediaItems(prev => [...prev, newMediaItem]);
     } catch (error) {
-      console.error('Error adding media item:', error);
+      console.error('❌ Error adding media item:', error);
       Alert.alert('Error', 'Failed to add media item');
     }
   };
@@ -382,16 +426,111 @@ export default function Post() {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setIsUploadingMedia(false);
+    setUploadProgress('');
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      let uploadedMediaUrls: string[] = [];
+      let uploadedAudioUrl: string = '';
 
+      // Step 1: Upload media files to Cloudinary if any exist
+      if (mediaItems.length > 0 || recordingUri) {
+        setIsUploadingMedia(true);
+        setUploadProgress('Uploading media files...');
+        console.log('📁 Uploading media files to Cloudinary...');
+        
+        // Retry logic for media upload
+        let uploadAttempts = 0;
+        const maxRetries = 3;
+        let uploadResult = null;
+        
+        while (uploadAttempts < maxRetries && !uploadResult?.success) {
+          try {
+            uploadAttempts++;
+            if (uploadAttempts > 1) {
+              setUploadProgress(`Retrying upload... (${uploadAttempts}/${maxRetries})`);
+            }
+            
+            uploadResult = await uploadReportMedia(mediaItems, recordingUri || undefined, user?.id || '');
+            
+            if (uploadResult.success) {
+              break;
+            }
+          } catch (retryError) {
+            console.error(`Upload attempt ${uploadAttempts} failed:`, retryError);
+            if (uploadAttempts === maxRetries) {
+              throw new Error(`Failed to upload media after ${maxRetries} attempts: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
+            }
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts));
+          }
+        }
+        
+        if (!uploadResult?.success) {
+          throw new Error(uploadResult?.message || 'Failed to upload media files after multiple attempts');
+        }
+
+        uploadedMediaUrls = uploadResult.mediaUrls || [];
+        uploadedAudioUrl = uploadResult.audioUrl || '';
+        
+        console.log('✅ Media uploaded successfully:', {
+          mediaUrls: uploadedMediaUrls,
+          audioUrl: uploadedAudioUrl
+        });
+        
+        setIsUploadingMedia(false);
+        setUploadProgress('Media uploaded successfully!');
+      }
+
+      // Get department from selected category
       const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
-      const reportId = 'CMP' + Math.floor(Math.random() * 10000).toString().padStart(3, '0');
+      
+      setUploadProgress('Creating report...');
+      
+      // Step 2: Create report data with Cloudinary URLs
+      const reportData = {
+        userId: user?.id || '',
+        title: title.trim(),
+        description: description.trim(),
+        category: selectedCategory,
+        priority: selectedPriority,
+        latitude: location?.latitude || 0,
+        longitude: location?.longitude || 0,
+        address: location?.address || '',
+        department: selectedCategoryData?.department || 'General',
+        mediaUrls: uploadedMediaUrls,
+        audioUrl: uploadedAudioUrl
+      };
+
+      // Step 3: Call the actual API to create the report with retry logic
+      let reportAttempts = 0;
+      const maxReportRetries = 2;
+      let reportResponse = null;
+      
+      while (reportAttempts < maxReportRetries && !reportResponse) {
+        try {
+          reportAttempts++;
+          if (reportAttempts > 1) {
+            setUploadProgress(`Retrying report creation... (${reportAttempts}/${maxReportRetries})`);
+          }
+          
+          reportResponse = await createReport(reportData);
+          break;
+        } catch (reportError) {
+          console.error(`Report creation attempt ${reportAttempts} failed:`, reportError);
+          if (reportAttempts === maxReportRetries) {
+            throw new Error(`Failed to create report after ${maxReportRetries} attempts: ${reportError instanceof Error ? reportError.message : 'Unknown error'}`);
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      setUploadProgress('Report submitted successfully!');
 
       Alert.alert(
         'Report Submitted Successfully!',
-        `Your report has been submitted with ID: ${reportId}\n\nAssigned to: ${selectedCategoryData?.department}\nYou will receive updates on the progress.`,
+        `Your report has been submitted!\n\nAssigned to: ${selectedCategoryData?.department}\nYou will receive updates on the progress.`,
         [
           {
             text: 'OK',
@@ -403,12 +542,34 @@ export default function Post() {
               setSelectedPriority('medium');
               setMediaItems([]);
               removeRecording();
+              setUploadProgress('');
+              // Navigate back or to home
+              router.back();
             },
           },
         ]
       );
     } catch (error) {
-      Alert.alert('Submission Failed', 'Please try again later');
+      console.error('Error submitting report:', error);
+      const errorMessage = (error instanceof Error) ? error.message : 'Please check your connection and try again';
+      setUploadProgress('');
+      setIsUploadingMedia(false);
+      
+      // Show retry option for network errors
+      Alert.alert(
+        'Submission Failed',
+        errorMessage,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Retry',
+            onPress: () => submitReport(),
+          },
+        ]
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -651,14 +812,23 @@ export default function Post() {
             disabled={isSubmitting}
           >
             {isSubmitting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <View style={styles.submitLoadingContainer}>
+                <ActivityIndicator size="small" color="#FFFFFF" />
+                <Text style={styles.submitButtonText}>
+                  {isUploadingMedia ? 'Uploading...' : uploadProgress || 'Submitting...'}
+                </Text>
+              </View>
             ) : (
-              <>
+              <View style={styles.submitContentContainer}>
                 <Ionicons name="send" size={20} color="#FFFFFF" />
                 <Text style={styles.submitButtonText}>Submit Report</Text>
-              </>
+              </View>
             )}
           </TouchableOpacity>
+          
+          {uploadProgress && isSubmitting && (
+            <Text style={styles.progressText}>{uploadProgress}</Text>
+          )}
           
           <Text style={styles.submitNote}>
             Your report will be automatically routed to the appropriate department and you'll receive updates on its status.
@@ -941,6 +1111,23 @@ dropdownItemText: {
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginLeft: 8,
+  },
+  submitLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitContentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#FF6B35',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
   submitNote: {
     fontSize: 14,
