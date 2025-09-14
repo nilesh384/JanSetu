@@ -70,8 +70,9 @@ const createOrLoginUser = async (req, res) => {
                         profile_image_url, 
                         is_verified,
                         total_reports,
-                        resolved_reports
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        resolved_reports,
+                        last_login
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)
                     RETURNING *
                 `;
                 
@@ -90,15 +91,17 @@ const createOrLoginUser = async (req, res) => {
                 
                 // Map snake_case to camelCase for frontend consistency
                 const mappedNewUser = {
-                    ...newUser,
+                    id: newUser.id,
                     phoneNumber: newUser.phone_number,
+                    email: newUser.email,
                     fullName: newUser.full_name,
                     profileImageUrl: newUser.profile_image_url,
                     isVerified: newUser.is_verified,
                     totalReports: newUser.total_reports,
                     resolvedReports: newUser.resolved_reports,
                     createdAt: newUser.created_at,
-                    updatedAt: newUser.updated_at
+                    updatedAt: newUser.updated_at,
+                    lastLogin: newUser.last_login
                 };
                 
                 return res.status(201).json({
@@ -168,10 +171,27 @@ const updateUserProfile = async (req, res) => {
             
             console.log('✅ Profile updated successfully:', userId);
             
+            const updatedUser = result.rows[0];
+            
+            // Map database fields to camelCase for frontend consistency
+            const mappedUser = {
+                id: updatedUser.id,
+                phoneNumber: updatedUser.phone_number,
+                email: updatedUser.email,
+                fullName: updatedUser.full_name,
+                profileImageUrl: updatedUser.profile_image_url,
+                isVerified: updatedUser.is_verified,
+                totalReports: updatedUser.total_reports,
+                resolvedReports: updatedUser.resolved_reports,
+                createdAt: updatedUser.created_at,
+                updatedAt: updatedUser.updated_at,
+                lastLogin: updatedUser.last_login
+            };
+            
             res.status(200).json({
                 success: true,
                 message: 'Profile updated successfully',
-                user: result.rows[0]
+                user: mappedUser
             });
             
         } finally {
@@ -283,9 +303,24 @@ const getUserByPhone = async (req, res) => {
             const user = result.rows[0];
             console.log('✅ User found by phone:', user.id);
             
+            // Map database fields to camelCase for frontend consistency
+            const mappedUser = {
+                id: user.id,
+                phoneNumber: user.phone_number,
+                email: user.email,
+                fullName: user.full_name,
+                profileImageUrl: user.profile_image_url,
+                isVerified: user.is_verified,
+                totalReports: user.total_reports,
+                resolvedReports: user.resolved_reports,
+                createdAt: user.created_at,
+                updatedAt: user.updated_at,
+                lastLogin: user.last_login
+            };
+            
             res.status(200).json({
                 success: true,
-                user: user,
+                user: mappedUser,
                 requiresProfileSetup: !user.full_name || !user.email
             });
             
@@ -382,10 +417,25 @@ const uploadProfileImage = async (req, res) => {
             
             console.log('✅ Profile image updated in database');
             
+            // Map database fields to camelCase for frontend consistency
+            const mappedUser = {
+                id: updatedUser.id,
+                phoneNumber: updatedUser.phone_number,
+                email: updatedUser.email,
+                fullName: updatedUser.full_name,
+                profileImageUrl: updatedUser.profile_image_url,
+                isVerified: updatedUser.is_verified,
+                totalReports: updatedUser.total_reports,
+                resolvedReports: updatedUser.resolved_reports,
+                createdAt: updatedUser.created_at,
+                updatedAt: updatedUser.updated_at,
+                lastLogin: updatedUser.last_login
+            };
+            
             res.status(200).json({
                 success: true,
                 message: 'Profile image uploaded successfully',
-                user: updatedUser,
+                user: mappedUser,
                 imageUrl: cloudinaryResponse.secure_url
             });
             
@@ -402,6 +452,66 @@ const uploadProfileImage = async (req, res) => {
         });
     }
 };
+
+// Delete user
+
+const deleteUser = async (req, res) => {
+    try {
+        const { phoneNumber } = req.body;
+        
+        if (!phoneNumber) {
+            return res.status(400).json({
+                success: false,
+                message: "Phone number is required"
+            });
+        }
+
+        console.log('🗑️ Deleting user with phone:', phoneNumber);
+
+        const client = await dbConnect();
+        
+        try {
+            // Check if user exists
+            const getUserQuery = `SELECT * FROM users WHERE phone_number = $1`;
+            const userResult = await client.query(getUserQuery, [phoneNumber]);
+            
+            if (userResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const user = userResult.rows[0];
+            
+            // Delete user from database
+            const deleteQuery = `DELETE FROM users WHERE phone_number = $1 RETURNING *`;
+            const result = await client.query(deleteQuery, [phoneNumber]);
+            const deletedUser = result.rows[0];
+            
+            console.log('✅ User deleted from database');
+            
+            res.status(200).json({
+                success: true,
+                message: 'User deleted successfully',
+                user: deletedUser
+            });
+            
+        } finally {
+            client.end();
+        }
+
+    } catch (error) {
+        console.error('❌ Error in deleteUser:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error',
+            error: error.message
+        });
+    }
+};
+
+
 
 // Legacy functions (keeping for backward compatibility but updated responses)
 const registerUser = (req, res) => {
@@ -425,12 +535,15 @@ const updateUser = (req, res) => {
     });
 };
 
+
+
 export { 
     createOrLoginUser,
     updateUserProfile, 
     getUserById,
     getUserByPhone,
     uploadProfileImage,
+    deleteUser,
     registerUser, 
     loginUser, 
     updateUser 

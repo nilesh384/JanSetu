@@ -41,22 +41,10 @@ export default function PhoneInput() {
       
       if (result.success) {
         // Show success message
-        Alert.alert(
-          'OTP Sent!', 
-          `Verification code has been sent to +91 ${phoneNumber}`,
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                // Navigate to OTP screen with full phone number
-                router.push({
+        router.push({
                   pathname: '/auth/otp' as any,
                   params: { phoneNumber: fullPhoneNumber }
                 });
-              }
-            }
-          ]
-        );
       } else {
         // Show error message
         Alert.alert('Error', result.message || 'Failed to send OTP. Please try again.');
@@ -77,7 +65,6 @@ export default function PhoneInput() {
         {/* Header with app branding */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <Ionicons name="people-circle" size={60} color="#FF6B35" />
             <Text style={styles.appName}>CrowdSource</Text>
           </View>
         </View>

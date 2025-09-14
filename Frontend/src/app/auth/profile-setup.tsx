@@ -94,16 +94,7 @@ export default function ProfileSetup() {
         // Refresh user data from database to get updated info
         await refreshUser();
 
-        Alert.alert(
-          'Profile Updated!',
-          'Your profile has been set up successfully.',
-          [
-            {
-              text: 'Continue',
-              onPress: () => router.replace('/(tabs)/Home' as any)
-            }
-          ]
-        );
+        router.replace('/(tabs)/Home' as any);
       } else {
         Alert.alert('Error', result.message || 'Failed to update profile. Please try again.');
       }

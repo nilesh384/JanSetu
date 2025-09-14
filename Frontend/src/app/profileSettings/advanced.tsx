@@ -12,6 +12,9 @@ import {
     View,
 } from 'react-native';
 
+import { useAuth } from '@/src/context/AuthContext';
+import { deleteUser } from '@/src/api/user';
+
 interface AdvancedSetting {
   id: string;
   title: string;
@@ -21,6 +24,9 @@ interface AdvancedSetting {
 }
 
 export default function Advanced() {
+
+  const { user, logout } = useAuth();
+
   const [settings, setSettings] = useState<AdvancedSetting[]>([
     {
       id: 'debug_mode',
@@ -114,16 +120,25 @@ export default function Advanced() {
           text: 'Delete Account',
           style: 'destructive',
           onPress: () => {
-            Alert.alert(
-              'Account Deletion Initiated',
-              'Your account deletion request has been submitted. You will receive a confirmation email with further instructions.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => router.back()
-                }
-              ]
-            );
+            // Call API to delete account using phoneNumber
+            if (!user?.phoneNumber) {
+              Alert.alert('Error', 'Phone number not found. Please log in again.');
+              return;
+            }
+            
+            deleteUser(user.phoneNumber).then((result) => {
+              if (result.success) {
+                // First logout the user to clear local data
+                logout();
+                Alert.alert('Account Deleted', 'Your account has been deleted successfully.');
+                router.replace('/auth/phone' as any);
+              } else {
+                Alert.alert('Error', result.message || 'Failed to delete account. Please try again later.');
+              }
+            }).catch((error) => {
+              console.error('Delete account error:', error);
+              Alert.alert('Error', 'Failed to delete account. Please try again later.');
+            });
           }
         },
       ]
@@ -176,16 +191,16 @@ export default function Advanced() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.warningSection}>
+        {/* <View style={styles.warningSection}>
           <View style={styles.warningItem}>
             <Ionicons name="warning" size={20} color="#FF8800" />
             <Text style={styles.warningText}>
               These settings are for advanced users. Changing them may affect app performance.
             </Text>
           </View>
-        </View>
+        </View> */}
 
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>Developer Options</Text>
 
           {settings.map((setting) => (
@@ -202,9 +217,9 @@ export default function Advanced() {
               />
             </View>
           ))}
-        </View>
+        </View> */}
 
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <Text style={styles.sectionTitle}>Maintenance</Text>
 
           {advancedActions.map((action) => (
@@ -224,7 +239,7 @@ export default function Advanced() {
               <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
             </TouchableOpacity>
           ))}
-        </View>
+        </View> */}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Management</Text>
@@ -246,32 +261,16 @@ export default function Advanced() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.infoSection}>
+        {/* <View style={styles.infoSection}>
           <View style={styles.infoItem}>
             <Ionicons name="information-circle" size={20} color="#2196F3" />
             <Text style={styles.infoText}>
               Need help with these settings? Contact our support team.
             </Text>
           </View>
-        </View>
+        </View> */}
 
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSave}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.saveButtonText}>Save Settings</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+        
       </ScrollView>
     </SafeAreaView>
   );
