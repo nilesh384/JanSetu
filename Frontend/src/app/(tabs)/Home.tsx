@@ -1,10 +1,118 @@
 import HomeHeader from '@/components/HomeHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
+import * as Location from 'expo-location';
+import { getNearbyReports } from '@/src/api/report';
+import { useAuth } from '@/src/context/AuthContext';
+
+interface Report {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  priority: string;
+  address: string;
+  isResolved: boolean;
+  createdAt: string;
+  distance?: number;
+}
 
 export default function Home() {
+  const { user } = useAuth();
+  const [nearbyReports, setNearbyReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInMs = now.getTime() - date.getTime();
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+    
+    if (diffInDays === 0) return 'Today';
+    if (diffInDays === 1) return '1 day ago';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} week${Math.floor(diffInDays / 7) > 1 ? 's' : ''} ago`;
+    if (diffInDays < 365) return `${Math.floor(diffInDays / 30)} month${Math.floor(diffInDays / 30) > 1 ? 's' : ''} ago`;
+    return `${Math.floor(diffInDays / 365)} year${Math.floor(diffInDays / 365) > 1 ? 's' : ''} ago`;
+  };
+
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // Distance in kilometers
+  };
+
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        console.log('Location permission denied');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error('Error getting location:', error);
+    }
+  };
+
+  const fetchNearbyReports = async () => {
+    if (!userLocation) return;
+
+    try {
+      setLoading(true);
+      const response = await getNearbyReports(userLocation, 5) as any; // 5km radius
+
+      if (response && response.success && response.reports) {
+        // Calculate distances and get only the latest 2
+        const reportsWithDistance = response.reports
+          .map((report: any) => {
+            if (report.latitude && report.longitude && userLocation) {
+              const distance = calculateDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                report.latitude,
+                report.longitude
+              );
+              return { ...report, distance };
+            }
+            return report;
+          })
+          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 2); // Get only the latest 2 reports
+
+        setNearbyReports(reportsWithDistance);
+      }
+    } catch (error) {
+      console.error('Error fetching nearby reports:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    getUserLocation();
+  }, []);
+
+  useEffect(() => {
+    if (userLocation) {
+      fetchNearbyReports();
+    }
+  }, [userLocation]);
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -65,39 +173,61 @@ export default function Home() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitle}>
-                <Text style={styles.sectionTitleText}>Recent Reports</Text>
-                <TouchableOpacity onPress={() => router.push('/(tabs)/Complaints' as any)}>
+                <Text style={styles.sectionTitleText}>Recent Nearby Reports</Text>
+                <TouchableOpacity onPress={() => router.push('/complaints/nearby')}>
                     <Text style={styles.viewAllText}>View All</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
             <View style={styles.reportsList}>
-              <View style={styles.reportItem}>
-                <View style={[styles.reportStatus, { backgroundColor: '#FEF3C7' }]}>
-                  <Ionicons name="time" size={16} color="#D97706" />
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#2563EB" />
+                  <Text style={styles.loadingText}>Loading nearby reports...</Text>
                 </View>
-                <View style={styles.reportContent}>
-                  <Text style={styles.reportTitle}>Pothole on Main Road</Text>
-                  <Text style={styles.reportLocation}>Near City Center • 2 days ago</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={[styles.statusText, { color: '#D97706' }]}>In Progress</Text>
-                </View>
-              </View>
+              ) : nearbyReports.length > 0 ? (
+                nearbyReports.map((report) => {
+                  const statusColor = report.isResolved ? '#059669' : '#D97706';
+                  const statusBgColor = report.isResolved ? '#DCFCE7' : '#FEF3C7';
+                  const statusText = report.isResolved ? 'Resolved' : 'In Progress';
+                  const statusIcon = report.isResolved ? 'checkmark-circle' : 'time';
 
-              <View style={styles.reportItem}>
-                <View style={[styles.reportStatus, { backgroundColor: '#DCFCE7' }]}>
-                  <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                  return (
+                    <TouchableOpacity
+                      key={report.id}
+                      style={styles.reportItem}
+                      onPress={() => {
+                        // Navigate to nearby page and pass the report ID
+                        router.push({
+                          pathname: '/complaints/nearby',
+                          params: { selectedReportId: report.id }
+                        } as any);
+                      }}
+                    >
+                      <View style={[styles.reportStatus, { backgroundColor: statusBgColor }]}>
+                        <Ionicons name={statusIcon} size={16} color={statusColor} />
+                      </View>
+                      <View style={styles.reportContent}>
+                        <Text style={styles.reportTitle} numberOfLines={1}>{report.title}</Text>
+                        <Text style={styles.reportLocation} numberOfLines={1}>
+                          {formatTimeAgo(report.createdAt)}
+                          {report.distance && ` • ${report.distance.toFixed(1)}km away`}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: statusBgColor }]}>
+                        <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="location-outline" size={32} color="#CCCCCC" />
+                  <Text style={styles.emptyText}>No nearby reports found</Text>
+                  <Text style={styles.emptySubtext}>Check back later or expand your search area</Text>
                 </View>
-                <View style={styles.reportContent}>
-                  <Text style={styles.reportTitle}>Streetlight Repair</Text>
-                  <Text style={styles.reportLocation}>Residential Area • 1 week ago</Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
-                  <Text style={[styles.statusText, { color: '#059669' }]}>Resolved</Text>
-                </View>
-              </View>
+              )}
             </View>
           </View>
 
@@ -403,6 +533,42 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     color: '#666666',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#666666',
+    marginLeft: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333333',
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 4,
     textAlign: 'center',
   },
 });

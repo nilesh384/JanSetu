@@ -14,8 +14,10 @@ import {
   Alert,
   Modal,
   Image,
-  Dimensions,
+  Dimensions
 } from 'react-native';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useAuth } from '@/src/context/AuthContext';
 import { getUserReports } from '@/src/api/report';
 import { Audio } from 'expo-av';
@@ -90,6 +92,7 @@ export default function MyComplaints() {
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [currentImages, setCurrentImages] = useState<string[]>([]);
+  const [isHorizontalScrollEnabled, setIsHorizontalScrollEnabled] = useState(true);
 
   //audio
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -97,7 +100,99 @@ export default function MyComplaints() {
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [audioPosition, setAudioPosition] = useState<number | null>(null);
 
+  //zoom in out
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedScale = useSharedValue(1);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
 
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      // Save current values when pinch starts
+      savedScale.value = scale.value;
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      const newScale = savedScale.value * event.scale;
+      const clampedScale = Math.min(Math.max(newScale, 0.5), 3);
+      scale.value = clampedScale;
+
+      // Reset translation if zooming back to 1x
+      if (clampedScale <= 1) {
+        translateX.value = 0;
+        translateY.value = 0;
+        setIsHorizontalScrollEnabled(true);
+      } else {
+        setIsHorizontalScrollEnabled(false);
+      }
+    })
+    .onEnd(() => {
+      // Keep the current scale value
+    });
+
+  const panGesture = Gesture.Pan()
+    .maxPointers(1) // Only allow single finger pan
+    .onStart(() => {
+      // Save current values when pan starts
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate((event) => {
+      // Only allow panning when zoomed in
+      if (scale.value > 1) {
+        // Disable horizontal scrolling when zoomed
+        setIsHorizontalScrollEnabled(false);
+
+        const screenWidth = Dimensions.get('window').width;
+        const screenHeight = Dimensions.get('window').height;
+        const imageWidth = screenWidth * scale.value;
+        const imageHeight = screenHeight * scale.value;
+
+        // Calculate bounds
+        const maxTranslateX = Math.max(0, (imageWidth - screenWidth) / 2);
+        const maxTranslateY = Math.max(0, (imageHeight - screenHeight) / 2);
+
+        // Update translation with bounds checking
+        const newTranslateX = savedTranslateX.value + event.translationX;
+        const newTranslateY = savedTranslateY.value + event.translationY;
+
+        translateX.value = Math.max(-maxTranslateX, Math.min(maxTranslateX, newTranslateX));
+        translateY.value = Math.max(-maxTranslateY, Math.min(maxTranslateY, newTranslateY));
+      }
+    })
+    .onEnd(() => {
+      // Re-enable horizontal scrolling after a short delay
+      setTimeout(() => {
+        setIsHorizontalScrollEnabled(true);
+      }, 100);
+    });
+
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onStart(() => {
+      if (scale.value === 1) {
+        scale.value = withTiming(2);
+        setIsHorizontalScrollEnabled(false);
+      } else {
+        scale.value = withTiming(1);
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        setIsHorizontalScrollEnabled(true);
+      }
+    });
+
+  const combinedGesture = Gesture.Exclusive(doubleTapGesture, pinchGesture, panGesture);
+
+  const animatedImageStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+      { translateY: translateY.value }
+    ]
+  }));
 
   // Fetch user reports
   const fetchReports = async (isRefresh = false) => {
@@ -183,12 +278,12 @@ export default function MyComplaints() {
   };
 
   const formatAudioTime = (milliseconds: number | null) => {
-  if (!milliseconds) return '0:00';
-  const seconds = Math.floor(milliseconds / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-};
+    if (!milliseconds) return '0:00';
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     return () => {
@@ -306,7 +401,8 @@ export default function MyComplaints() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -355,12 +451,7 @@ export default function MyComplaints() {
                   activeOpacity={0.8}
                 >
                   <View style={styles.filterTabContent}>
-                    <Ionicons
-                      name={filter.icon as any}
-                      size={18}
-                      color={selectedFilter === filter.key ? '#FFFFFF' : '#666666'}
-                      style={styles.filterIcon}
-                    />
+                    
                     <View style={styles.filterTextContainer}>
                       <Text style={[
                         styles.filterLabel,
@@ -486,6 +577,10 @@ export default function MyComplaints() {
                           onPress={() => {
                             setCurrentImages(selectedReport.mediaUrls);
                             setSelectedImageIndex(index);
+                            scale.value = 1; // Reset zoom when opening new image
+                            translateX.value = 0; // Reset pan position
+                            translateY.value = 0; // Reset pan position
+                            setIsHorizontalScrollEnabled(true); // Enable horizontal scrolling
                             setShowImageViewer(true);
                           }}
                         >
@@ -505,7 +600,8 @@ export default function MyComplaints() {
                     presentationStyle="fullScreen"
                     onRequestClose={() => setShowImageViewer(false)}
                   >
-                    <SafeAreaView style={styles.imageViewerContainer}>
+                    <GestureHandlerRootView style={{ flex: 1 }}>
+                      <SafeAreaView style={styles.imageViewerContainer}>
                       <View style={styles.imageViewerHeader}>
                         <TouchableOpacity
                           onPress={() => setShowImageViewer(false)}
@@ -516,13 +612,24 @@ export default function MyComplaints() {
                         <Text style={styles.imageViewerTitle}>
                           {selectedImageIndex + 1} of {currentImages.length}
                         </Text>
-                        <View style={styles.imageViewerPlaceholder} />
+                        <TouchableOpacity
+                          onPress={() => {
+                            scale.value = 1;
+                            translateX.value = 0;
+                            translateY.value = 0;
+                            setIsHorizontalScrollEnabled(true);
+                          }}
+                          style={styles.imageViewerResetButton}
+                        >
+                          <Ionicons name="refresh" size={24} color="#FFFFFF" />
+                        </TouchableOpacity>
                       </View>
 
                       <ScrollView
                         horizontal
                         pagingEnabled
                         showsHorizontalScrollIndicator={false}
+                        scrollEnabled={isHorizontalScrollEnabled}
                         onMomentumScrollEnd={(event) => {
                           const index = Math.round(event.nativeEvent.contentOffset.x / Dimensions.get('window').width);
                           setSelectedImageIndex(index);
@@ -531,11 +638,15 @@ export default function MyComplaints() {
                       >
                         {currentImages.map((imageUrl, index) => (
                           <View key={index} style={styles.imageViewerSlide}>
-                            <Image
-                              source={{ uri: imageUrl }}
-                              style={styles.fullScreenImage}
-                              resizeMode="contain"
-                            />
+                            <GestureDetector gesture={combinedGesture}>
+                              <Animated.View style={[styles.imageContainer, animatedImageStyle]}>
+                                <Image
+                                  source={{ uri: imageUrl }}
+                                  style={styles.fullScreenImage}
+                                  resizeMode="contain"
+                                />
+                              </Animated.View>
+                            </GestureDetector>
                           </View>
                         ))}
                       </ScrollView>
@@ -555,57 +666,58 @@ export default function MyComplaints() {
                         </View>
                       )}
                     </SafeAreaView>
+                    </GestureHandlerRootView>
                   </Modal>
 
                   {/* Audio */}
-{selectedReport.audioUrl && (
-  <View style={styles.audioPlayerContainer}>
-    <TouchableOpacity 
-      style={styles.audioPlayer}
-      onPress={() => {
-        if (isPlaying) {
-          stopAudio();
-        } else if (selectedReport.audioUrl) {
-          playAudio(selectedReport.audioUrl);
-        }
-      }}
-    >
-      <Ionicons 
-        name={isPlaying ? "pause-circle" : "play-circle"} 
-        size={32} 
-        color="#FF6B35" 
-      />
-      <View style={styles.audioInfo}>
-        <Text style={styles.audioText}>Voice Recording</Text>
-        <Text style={styles.audioTime}>
-          {formatAudioTime(audioPosition)} / {formatAudioTime(audioDuration)}
-        </Text>
-      </View>
-      <Ionicons 
-        name={isPlaying ? "volume-high" : "volume-medium"} 
-        size={20} 
-        color={isPlaying ? "#FF6B35" : "#666666"} 
-      />
-    </TouchableOpacity>
-    
-    {/* Audio Progress Bar */}
-    {audioDuration && (
-      <View style={styles.audioProgressContainer}>
-        <View style={styles.audioProgressBar}>
-          <View 
-            style={[
-              styles.audioProgressFill, 
-              { 
-                width: `${audioPosition && audioDuration ? 
-                  (audioPosition / audioDuration) * 100 : 0}%` 
-              }
-            ]} 
-          />
-        </View>
-      </View>
-    )}
-  </View>
-)}
+                  {selectedReport.audioUrl && (
+                    <View style={styles.audioPlayerContainer}>
+                      <TouchableOpacity
+                        style={styles.audioPlayer}
+                        onPress={() => {
+                          if (isPlaying) {
+                            stopAudio();
+                          } else if (selectedReport.audioUrl) {
+                            playAudio(selectedReport.audioUrl);
+                          }
+                        }}
+                      >
+                        <Ionicons
+                          name={isPlaying ? "pause-circle" : "play-circle"}
+                          size={32}
+                          color="#FF6B35"
+                        />
+                        <View style={styles.audioInfo}>
+                          <Text style={styles.audioText}>Voice Recording</Text>
+                          <Text style={styles.audioTime}>
+                            {formatAudioTime(audioPosition)} / {formatAudioTime(audioDuration)}
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name={isPlaying ? "volume-high" : "volume-medium"}
+                          size={20}
+                          color={isPlaying ? "#FF6B35" : "#666666"}
+                        />
+                      </TouchableOpacity>
+
+                      {/* Audio Progress Bar */}
+                      {audioDuration && (
+                        <View style={styles.audioProgressContainer}>
+                          <View style={styles.audioProgressBar}>
+                            <View
+                              style={[
+                                styles.audioProgressFill,
+                                {
+                                  width: `${audioPosition && audioDuration ?
+                                    (audioPosition / audioDuration) * 100 : 0}%`
+                                }
+                              ]}
+                            />
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -665,6 +777,7 @@ export default function MyComplaints() {
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -1195,9 +1308,23 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
   },
+  imageViewerResetButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
   imageViewerSlide: {
     width: Dimensions.get('window').width,
     height: Dimensions.get('window').height - 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageContainer: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1226,45 +1353,45 @@ const styles = StyleSheet.create({
   },
 
   // Audio Player Styles
-audioPlayerContainer: {
-  marginTop: 8,
-},
-audioPlayer: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: '#F8F9FA',
-  padding: 16,
-  borderRadius: 12,
-  gap: 12,
-  borderWidth: 1,
-  borderColor: '#E5E7EB',
-},
-audioInfo: {
-  flex: 1,
-},
-audioText: {
-  fontSize: 15,
-  color: '#374151',
-  fontWeight: '500',
-},
-audioTime: {
-  fontSize: 12,
-  color: '#6B7280',
-  marginTop: 2,
-},
-audioProgressContainer: {
-  paddingHorizontal: 16,
-  paddingTop: 8,
-},
-audioProgressBar: {
-  height: 4,
-  backgroundColor: '#E5E7EB',
-  borderRadius: 2,
-  overflow: 'hidden',
-},
-audioProgressFill: {
-  height: '100%',
-  backgroundColor: '#FF6B35',
-  borderRadius: 2,
-},
+  audioPlayerContainer: {
+    marginTop: 8,
+  },
+  audioPlayer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  audioInfo: {
+    flex: 1,
+  },
+  audioText: {
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  audioTime: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  audioProgressContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  audioProgressBar: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  audioProgressFill: {
+    height: '100%',
+    backgroundColor: '#FF6B35',
+    borderRadius: 2,
+  },
 });

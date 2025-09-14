@@ -55,20 +55,20 @@ export default function About() {
 
   const team = [
     {
-      name: 'Rajesh Kumar',
-      role: 'Project Lead',
-      department: 'Department of Higher and Technical Education',
+      name: 'Nilesh Bera',
+      role: 'Project Lead | Planner',
+      department: 'App Developer',
     },
     {
       name: 'Priya Singh',
-      role: 'Technical Lead',
-      department: 'Software Development',
+      role: 'Planner',
+      department: '',
     },
-    {
-      name: 'Amit Sharma',
-      role: 'UI/UX Designer',
-      department: 'Design Team',
-    },
+    // {
+    //   name: 'Amit Sharma',
+    //   role: 'UI/UX Designer',
+    //   department: 'Design Team',
+    // },
   ];
 
   return (
@@ -85,13 +85,6 @@ export default function About() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.heroSection}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="business" size={60} color="#FF6B35" />
-          </View>
-          <Text style={styles.appName}>Civic Reporter</Text>
-          <Text style={styles.tagline}>Empowering Communities, Driving Change</Text>
-        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Our Mission</Text>
@@ -269,7 +262,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333333',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   missionText: {
     fontSize: 14,
