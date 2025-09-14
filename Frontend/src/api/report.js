@@ -268,6 +268,11 @@ export const getNearbyReports = async (location, radius = 5, options = {}) => {
   try {
     console.log('📍 Fetching nearby reports:', location, 'radius:', radius);
     
+    // Validate location object
+    if (!location || typeof location.latitude === 'undefined' || typeof location.longitude === 'undefined') {
+      throw new Error('Invalid location object. Must have latitude and longitude properties.');
+    }
+    
     // Build query parameters
     const queryParams = new URLSearchParams({
       latitude: location.latitude.toString(),
@@ -306,14 +311,23 @@ export const getNearbyReports = async (location, radius = 5, options = {}) => {
       throw new Error(data.message || 'Failed to fetch nearby reports');
     }
 
-    return {
-      success: true,
-      reports: data.reports,
-      total: data.total,
-      currentPage: data.currentPage,
-      totalPages: data.totalPages,
-      message: data.message
-    };
+    // Handle backend response structure
+    if (data && data.success && data.reports) {
+      return {
+        success: true,
+        reports: data.reports || [],
+        total: data.reports ? data.reports.length : 0,
+        pagination: data.pagination || {},
+        message: data.message || 'Reports fetched successfully'
+      };
+    } else {
+      return {
+        success: false,
+        reports: [],
+        total: 0,
+        message: data.message || 'No reports found'
+      };
+    }
 
   } catch (error) {
     console.error('❌ Error fetching nearby reports:', error);

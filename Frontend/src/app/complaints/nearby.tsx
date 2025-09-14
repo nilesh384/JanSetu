@@ -1,6 +1,6 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import React, { useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect } from 'react';
 import {
   FlatList,
   SafeAreaView,
@@ -10,110 +10,330 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  Modal,
+  Image,
+  Dimensions,
 } from 'react-native';
+import * as Location from 'expo-location';
+import { Audio } from 'expo-av';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+import {
+  GestureDetector,
+  Gesture,
+  GestureHandlerRootView,
+} from 'react-native-gesture-handler';
+
+import { getNearbyReports } from '@/src/api/report';
+import { useAuth } from '@/src/context/AuthContext';
 
 interface Report {
   id: string;
+  userId: string;
   title: string;
   description: string;
   category: string;
-  status: 'Submitted' | 'In Progress' | 'Resolved' | 'Rejected';
-  priority: 'Low' | 'Medium' | 'High' | 'Critical';
-  location: string;
+  priority: string;
+  mediaUrls: string[];
+  audioUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  address: string;
   department: string;
-  submittedDate: string;
-  estimatedResolution?: string;
-  reportedBy?: string;
-  distance?: string;
+  isResolved: boolean;
+  createdAt: string;
+  resolvedAt: string | null;
+  timeTakenToResolve: number | null;
+  distance?: number;
 }
 
-const nearbyReports: Report[] = [
-  {
-    id: 'CMP003',
-    title: 'Water Leakage on Park Avenue',
-    description: 'Major water pipe burst causing road flooding',
-    category: 'Water Supply',
-    status: 'In Progress',
-    priority: 'Critical',
-    location: 'Park Avenue, Sector 12',
-    department: 'Water Board',
-    submittedDate: '2024-01-16',
-    estimatedResolution: '1-2 days',
-    reportedBy: 'Citizen #4821',
-    distance: '0.3 km',
-  },
-  {
-    id: 'CMP004',
-    title: 'Garbage Collection Delay',
-    description: 'Waste not collected for 4 days, causing health concerns',
-    category: 'Sanitation',
-    status: 'Submitted',
-    priority: 'High',
-    location: 'Green Valley, Block C',
-    department: 'Sanitation Dept',
-    submittedDate: '2024-01-15',
-    reportedBy: 'Citizen #2156',
-    distance: '0.8 km',
-  },
-  {
-    id: 'CMP005',
-    title: 'Traffic Signal Malfunction',
-    description: 'Traffic light stuck on red causing congestion',
-    category: 'Traffic',
-    status: 'Resolved',
-    priority: 'High',
-    location: 'Central Square Junction',
-    department: 'Traffic Police',
-    submittedDate: '2024-01-13',
-    estimatedResolution: 'Completed',
-    reportedBy: 'Citizen #8934',
-    distance: '1.2 km',
-  },
-  {
-    id: 'CMP006',
-    title: 'Stray Dog Issue',
-    description: 'Pack of stray dogs causing safety concerns for children',
-    category: 'Animal Control',
-    status: 'Submitted',
-    priority: 'Medium',
-    location: 'Sunrise Colony',
-    department: 'Animal Control',
-    submittedDate: '2024-01-14',
-    reportedBy: 'Citizen #5672',
-    distance: '2.1 km',
-  },
-];
+interface ApiResponse {
+  success: boolean;
+  reports: Report[];
+}
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'Submitted': return '#2196F3';
-    case 'In Progress': return '#FF9800';
-    case 'Resolved': return '#4CAF50';
-    case 'Rejected': return '#F44336';
-    default: return '#757575';
-  }
+// Helper functions
+const getStatusColor = (isResolved: boolean) => {
+  return isResolved ? '#4CAF50' : '#2196F3';
+};
+
+const getStatusText = (isResolved: boolean) => {
+  return isResolved ? 'Resolved' : 'Submitted';
 };
 
 const getPriorityIcon = (priority: string) => {
-  switch (priority) {
-    case 'Critical': return 'warning';
-    case 'High': return 'priority-high';
-    case 'Medium': return 'remove';
-    case 'Low': return 'keyboard-arrow-down';
+  switch (priority.toLowerCase()) {
+    case 'critical': return 'warning';
+    case 'high': return 'priority-high';
+    case 'medium': return 'remove';
+    case 'low': return 'keyboard-arrow-down';
     default: return 'remove';
   }
 };
 
+const getPriorityColor = (priority: string) => {
+  switch (priority.toLowerCase()) {
+    case 'critical': return '#E53E3E';
+    case 'high': return '#FF6B35';
+    case 'medium': return '#FFB020';
+    case 'low': return '#38A169';
+    default: return '#666666';
+  }
+};
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return {
+    date: date.toLocaleDateString(),
+    time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  };
+};
+
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const distance = R * c; // Distance in kilometers
+  return distance;
+};
+
 export default function NearbyComplaints() {
+  const { user } = useAuth();
+  const { selectedReportId } = useLocalSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [sortBy, setSortBy] = useState('distance');
+  const [reports, setReports] = useState<Report[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [selectedReport, setSelectedReport] = useState<Report | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // Audio player state
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [audioPosition, setAudioPosition] = useState<number | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number | null>(null);
+
+  // Image viewer state
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [currentImages, setCurrentImages] = useState<string[]>([]);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isHorizontalScrollEnabled, setIsHorizontalScrollEnabled] = useState(true);
+
+  // Animated values for zoom and pan
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+
+  // Gesture handlers
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      scale.value = Math.max(1, Math.min(event.scale, 4));
+    })
+    .onEnd(() => {
+      if (scale.value < 1.2) {
+        scale.value = withTiming(1);
+        translateX.value = withTiming(0);
+        translateY.value = withTiming(0);
+        runOnJS(setIsHorizontalScrollEnabled)(true);
+      } else {
+        runOnJS(setIsHorizontalScrollEnabled)(false);
+      }
+    });
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      if (scale.value > 1) {
+        const maxTranslateX = (scale.value - 1) * (Dimensions.get('window').width / 2);
+        const maxTranslateY = (scale.value - 1) * (Dimensions.get('window').height / 2);
+        
+        translateX.value = Math.max(-maxTranslateX, Math.min(maxTranslateX, translateX.value + event.translationX));
+        translateY.value = Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY.value + event.translationY));
+      }
+    });
+
+  const combinedGesture = Gesture.Simultaneous(pinchGesture, panGesture);
+
+  const animatedImageStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
+
+  // Audio functions
+  const playAudio = async (audioUrl: string) => {
+    try {
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: audioUrl },
+        { shouldPlay: true },
+        onPlaybackStatusUpdate
+      );
+
+      setSound(newSound);
+      setIsPlaying(true);
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      Alert.alert('Error', 'Could not play audio recording');
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setAudioPosition(status.positionMillis);
+      setAudioDuration(status.durationMillis);
+
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+        setAudioPosition(0);
+      }
+    }
+  };
+
+  const stopAudio = async () => {
+    try {
+      if (sound) {
+        await sound.stopAsync();
+        setIsPlaying(false);
+        setAudioPosition(0);
+      }
+    } catch (error) {
+      console.error('Error stopping audio:', error);
+    }
+  };
+
+  const formatAudioTime = (milliseconds: number | null) => {
+    if (!milliseconds) return '0:00';
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const handleCloseModal = () => {
+    setShowDetailModal(false);
+    setSelectedReport(null);
+    // Clear the selectedReportId parameter from the URL
+    if (selectedReportId) {
+      router.replace('/complaints/nearby');
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
+
+  // Get user location
+  const getUserLocation = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to show nearby reports');
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error('Error getting location:', error);
+      Alert.alert('Error', 'Failed to get your location');
+    }
+  };
+
+  // Fetch nearby reports
+  const fetchNearbyReports = async (isRefresh = false) => {
+    if (!userLocation) return;
+
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      const response = await getNearbyReports(userLocation, 10) as ApiResponse; // Pass location object and 10km radius
+
+      if (response && response.success && response.reports) {
+        // Calculate distances and add to reports
+        const reportsWithDistance = response.reports.map((report: Report) => {
+          if (report.latitude && report.longitude && userLocation) {
+            const distance = calculateDistance(
+              userLocation.latitude,
+              userLocation.longitude,
+              report.latitude,
+              report.longitude
+            );
+            return { ...report, distance };
+          }
+          return report;
+        });
+
+        setReports(reportsWithDistance);
+      } else {
+        console.log('No reports found or invalid response:', response);
+        setReports([]);
+      }
+    } catch (error) {
+      console.error('Error fetching nearby reports:', error);
+      Alert.alert('Error', 'Failed to fetch nearby reports');
+      setReports([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    getUserLocation();
+  }, []);
+
+  useEffect(() => {
+    if (userLocation) {
+      fetchNearbyReports();
+    }
+  }, [userLocation]);
+
+  // Handle selectedReportId parameter - auto-open modal for specific report
+  useEffect(() => {
+    if (selectedReportId && reports.length > 0) {
+      const report = reports.find(r => r.id === selectedReportId);
+      if (report) {
+        setSelectedReport(report);
+        setShowDetailModal(true);
+      }
+    }
+  }, [selectedReportId, reports]);
 
   const filters = [
-    { key: 'All', label: 'All', count: nearbyReports.length, icon: 'list-outline' },
-    { key: 'Submitted', label: 'Submitted', count: nearbyReports.filter(r => r.status === 'Submitted').length, icon: 'checkmark-circle-outline' },
-    { key: 'In Progress', label: 'In Progress', count: nearbyReports.filter(r => r.status === 'In Progress').length, icon: 'time-outline' },
-    { key: 'Resolved', label: 'Resolved', count: nearbyReports.filter(r => r.status === 'Resolved').length, icon: 'checkmark-circle' },
+    { key: 'All', label: 'All', count: reports.length, icon: 'list-outline' },
+    { key: 'Submitted', label: 'Submitted', count: reports.filter((r: Report) => !r.isResolved).length, icon: 'checkmark-circle-outline' },
+    { key: 'Resolved', label: 'Resolved', count: reports.filter((r: Report) => r.isResolved).length, icon: 'checkmark-circle' },
   ];
 
   const sortOptions = [
@@ -122,92 +342,115 @@ export default function NearbyComplaints() {
     { key: 'priority', label: 'Priority', icon: 'priority-high' as const },
   ];
 
-  const filteredReports = nearbyReports
-    .filter(report => {
+  const filteredReports = reports
+    .filter((report: Report) => {
       const matchesSearch = report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            report.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesFilter = selectedFilter === 'All' || report.status === selectedFilter;
+      const matchesFilter = selectedFilter === 'All' || 
+        (selectedFilter === 'Submitted' && !report.isResolved) ||
+        (selectedFilter === 'Resolved' && report.isResolved);
       return matchesSearch && matchesFilter;
     })
-    .sort((a, b) => {
+    .sort((a: Report, b: Report) => {
       switch (sortBy) {
         case 'distance':
-          return parseFloat(a.distance || '0') - parseFloat(b.distance || '0');
+          return (a.distance || 0) - (b.distance || 0);
         case 'date':
-          return new Date(b.submittedDate).getTime() - new Date(a.submittedDate).getTime();
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         case 'priority':
-          const priorityOrder = { 'Critical': 4, 'High': 3, 'Medium': 2, 'Low': 1 };
-          return priorityOrder[b.priority] - priorityOrder[a.priority];
+          const priorityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+          return (priorityOrder[b.priority.toLowerCase() as keyof typeof priorityOrder] || 0) - 
+                 (priorityOrder[a.priority.toLowerCase() as keyof typeof priorityOrder] || 0);
         default:
           return 0;
       }
     });
 
   const renderReport = ({ item }: { item: Report }) => (
-    <TouchableOpacity style={styles.reportCard}>
+    <TouchableOpacity 
+      style={styles.reportCard}
+      onPress={() => {
+        setSelectedReport(item);
+        setShowDetailModal(true);
+      }}
+    >
       <View style={styles.reportHeader}>
         <View style={styles.reportIdContainer}>
-          <Text style={styles.reportId}>#{item.id}</Text>
-          <MaterialIcons name={getPriorityIcon(item.priority)} size={16} color="#FF6B35" />
-          {item.distance && (
+          <Text style={styles.reportId}>#{item.id.slice(-6).toUpperCase()}</Text>
+          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(item.priority) }]}>
+            <MaterialIcons name={getPriorityIcon(item.priority)} size={12} color="#FFFFFF" />
+            <Text style={styles.priorityText}>{item.priority}</Text>
+          </View>
+          {item.distance !== undefined && (
             <View style={styles.distanceBadge}>
               <Ionicons name="location" size={12} color="#4CAF50" />
-              <Text style={styles.distanceText}>{item.distance}</Text>
+              <Text style={styles.distanceText}>{item.distance.toFixed(1)} km</Text>
             </View>
           )}
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{item.status}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.isResolved) }]}>
+          <Text style={styles.statusText}>{getStatusText(item.isResolved)}</Text>
         </View>
       </View>
 
       <Text style={styles.reportTitle}>{item.title}</Text>
+      <Text style={styles.reportDescription} numberOfLines={2}>{item.description}</Text>
 
       <View style={styles.reportDetails}>
         <View style={styles.detailRow}>
           <Ionicons name="location-outline" size={16} color="#666666" />
-          <Text style={styles.detailText}>{item.location}</Text>
+          <Text style={styles.detailText}>{item.address}</Text>
         </View>
         <View style={styles.detailRow}>
           <MaterialIcons name="category" size={16} color="#666666" />
           <Text style={styles.detailText}>{item.category} • {item.department}</Text>
         </View>
         <View style={styles.detailRow}>
-          <Ionicons name="person-outline" size={16} color="#666666" />
-          <Text style={styles.detailText}>Reported by: {item.reportedBy}</Text>
-        </View>
-        <View style={styles.detailRow}>
           <Ionicons name="time-outline" size={16} color="#666666" />
-          <Text style={styles.detailText}>Submitted: {item.submittedDate}</Text>
+          <Text style={styles.detailText}>Submitted: {formatDate(item.createdAt).date}</Text>
         </View>
-      </View>
-
-      <View style={styles.reportFooter}>
-        <Text style={styles.dateText}>Priority: {item.priority}</Text>
-        {item.estimatedResolution && (
-          <Text style={styles.estimatedText}>Est: {item.estimatedResolution}</Text>
+        {item.mediaUrls.length > 0 && (
+          <View style={styles.detailRow}>
+            <Ionicons name="images-outline" size={16} color="#666666" />
+            <Text style={styles.detailText}>{item.mediaUrls.length} attachment(s)</Text>
+          </View>
         )}
       </View>
 
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="thumbs-up-outline" size={16} color="#4CAF50" />
-          <Text style={styles.actionText}>Support</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="chatbubble-outline" size={16} color="#2196F3" />
-          <Text style={styles.actionText}>Comment</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="share-outline" size={16} color="#FF9800" />
-          <Text style={styles.actionText}>Share</Text>
-        </TouchableOpacity>
+      <View style={styles.reportFooter}>
+        <Text style={styles.dateText}>
+          {formatDate(item.createdAt).time}
+        </Text>
+        {item.isResolved && item.resolvedAt && (
+          <Text style={styles.resolvedText}>
+            Resolved: {formatDate(item.resolvedAt).date}
+          </Text>
+        )}
       </View>
     </TouchableOpacity>
   );
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color="#333333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Nearby Reports</Text>
+          <View style={styles.headerPlaceholder} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF6B35" />
+          <Text style={styles.loadingText}>Finding nearby reports...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -248,12 +491,7 @@ export default function NearbyComplaints() {
               activeOpacity={0.8}
             >
               <View style={styles.filterTabContent}>
-                <Ionicons
-                  name={filter.icon as any}
-                  size={18}
-                  color={selectedFilter === filter.key ? '#FFFFFF' : '#666666'}
-                  style={styles.filterIcon}
-                />
+                
                 <View style={styles.filterTextContainer}>
                   <Text style={[
                     styles.filterLabel,
@@ -287,17 +525,288 @@ export default function NearbyComplaints() {
           keyExtractor={item => item.id}
           style={styles.reportsList}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchNearbyReports(true)}
+              colors={['#FF6B35']}
+            />
+          }
         />
       ) : (
         <View style={styles.emptyState}>
           <Ionicons name="location-outline" size={64} color="#CCCCCC" />
-          <Text style={styles.emptyTitle}>No Nearby Complaints</Text>
+          <Text style={styles.emptyTitle}>No Nearby Reports</Text>
           <Text style={styles.emptySubtitle}>
-            {searchQuery ? 'Try adjusting your search criteria' : 'No complaints found in your area matching this filter'}
+            {searchQuery ? 'Try adjusting your search criteria' : 'No reports found in your area matching this filter'}
           </Text>
         </View>
       )}
+
+      {/* Detail Modal - Full Screen */}
+      <Modal
+        visible={showDetailModal}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={handleCloseModal}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={handleCloseModal}
+              style={styles.modalCloseButton}
+            >
+              <Ionicons name="arrow-back" size={24} color="#333333" />
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Report Details</Text>
+            <View style={styles.headerPlaceholder} />
+          </View>
+
+          {selectedReport && (
+            <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {/* Header Info */}
+              <View style={styles.modalReportHeader}>
+                <View style={styles.modalReportInfo}>
+                  <Text style={styles.modalReportId}>#{selectedReport.id.slice(-6).toUpperCase()}</Text>
+                  <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(selectedReport.priority) }]}>
+                    <MaterialIcons name={getPriorityIcon(selectedReport.priority)} size={12} color="#FFFFFF" />
+                    <Text style={styles.priorityText}>{selectedReport.priority}</Text>
+                  </View>
+                  {selectedReport.distance !== undefined && (
+                    <View style={styles.distanceBadge}>
+                      <Ionicons name="location" size={12} color="#4CAF50" />
+                      <Text style={styles.distanceText}>{selectedReport.distance.toFixed(1)} km away</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedReport.isResolved) }]}>
+                  <Text style={styles.statusText}>{getStatusText(selectedReport.isResolved)}</Text>
+                </View>
+              </View>
+
+              {/* Title and Description */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Report Details</Text>
+                <Text style={styles.modalReportTitle}>{selectedReport.title}</Text>
+                <Text style={styles.modalReportDescription}>{selectedReport.description}</Text>
+              </View>
+
+              {/* Location and Details */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Location & Category</Text>
+                <View style={styles.modalDetailRow}>
+                  <Ionicons name="location" size={20} color="#666666" />
+                  <Text style={styles.modalDetailText}>{selectedReport.address || 'Location not specified'}</Text>
+                </View>
+                <View style={styles.modalDetailRow}>
+                  <MaterialIcons name="category" size={20} color="#666666" />
+                  <Text style={styles.modalDetailText}>{selectedReport.category}</Text>
+                </View>
+                <View style={styles.modalDetailRow}>
+                  <MaterialIcons name="business" size={20} color="#666666" />
+                  <Text style={styles.modalDetailText}>{selectedReport.department}</Text>
+                </View>
+              </View>
+
+              {/* Media Section */}
+              {(selectedReport.mediaUrls.length > 0 || selectedReport.audioUrl) && (
+                <View style={styles.modalSection}>
+                  <Text style={styles.modalSectionTitle}>Attachments</Text>
+
+                  {/* Images/Videos */}
+                  {selectedReport.mediaUrls.length > 0 && (
+                    <View style={styles.mediaGrid}>
+                      {selectedReport.mediaUrls.map((url, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.mediaItem}
+                          onPress={() => {
+                            setCurrentImages(selectedReport.mediaUrls);
+                            setSelectedImageIndex(index);
+                            scale.value = 1; // Reset zoom when opening new image
+                            translateX.value = 0; // Reset pan position
+                            translateY.value = 0; // Reset pan position
+                            setIsHorizontalScrollEnabled(true); // Enable horizontal scrolling
+                            setShowImageViewer(true);
+                          }}
+                        >
+                          <Image source={{ uri: url }} style={styles.mediaImage} />
+                          <View style={styles.mediaOverlay}>
+                            <Ionicons name="expand-outline" size={24} color="#FFFFFF" />
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Audio */}
+                  {selectedReport.audioUrl && (
+                    <View style={styles.audioPlayerContainer}>
+                      <TouchableOpacity
+                        style={styles.audioPlayer}
+                        onPress={() => {
+                          if (isPlaying) {
+                            stopAudio();
+                          } else if (selectedReport.audioUrl) {
+                            playAudio(selectedReport.audioUrl);
+                          }
+                        }}
+                      >
+                        <Ionicons
+                          name={isPlaying ? "pause-circle" : "play-circle"}
+                          size={32}
+                          color="#FF6B35"
+                        />
+                        <View style={styles.audioInfo}>
+                          <Text style={styles.audioText}>Voice Recording</Text>
+                          <Text style={styles.audioTime}>
+                            {formatAudioTime(audioPosition)} / {formatAudioTime(audioDuration)}
+                          </Text>
+                        </View>
+                        <Ionicons
+                          name={isPlaying ? "volume-high" : "volume-medium"}
+                          size={20}
+                          color={isPlaying ? "#FF6B35" : "#666666"}
+                        />
+                      </TouchableOpacity>
+
+                      {/* Audio Progress Bar */}
+                      {audioDuration && (
+                        <View style={styles.audioProgressContainer}>
+                          <View style={styles.audioProgressBar}>
+                            <View
+                              style={[
+                                styles.audioProgressFill,
+                                {
+                                  width: `${audioPosition && audioDuration ?
+                                    (audioPosition / audioDuration) * 100 : 0}%`
+                                }
+                              ]}
+                            />
+                          </View>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
+//TODO:  fix for video playback in media section
+              {/* Image Viewer Modal */}
+              <Modal
+                visible={showImageViewer}
+                animationType="fade"
+                presentationStyle="fullScreen"
+                onRequestClose={() => setShowImageViewer(false)}
+              >
+                <GestureHandlerRootView style={{ flex: 1 }}>
+                  <SafeAreaView style={styles.imageViewerContainer}>
+                  <View style={styles.imageViewerHeader}>
+                    <TouchableOpacity
+                      onPress={() => setShowImageViewer(false)}
+                      style={styles.imageViewerCloseButton}
+                    >
+                      <Ionicons name="close" size={28} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.imageViewerTitle}>
+                      {selectedImageIndex + 1} of {currentImages.length}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        scale.value = 1;
+                        translateX.value = 0;
+                        translateY.value = 0;
+                        setIsHorizontalScrollEnabled(true);
+                      }}
+                      style={styles.imageViewerResetButton}
+                    >
+                      <Ionicons name="refresh" size={24} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    scrollEnabled={isHorizontalScrollEnabled}
+                    onMomentumScrollEnd={(event) => {
+                      const index = Math.round(event.nativeEvent.contentOffset.x / Dimensions.get('window').width);
+                      setSelectedImageIndex(index);
+                    }}
+                    contentOffset={{ x: selectedImageIndex * Dimensions.get('window').width, y: 0 }}
+                  >
+                    {currentImages.map((imageUrl, index) => (
+                      <View key={index} style={styles.imageViewerSlide}>
+                        <GestureDetector gesture={combinedGesture}>
+                          <Animated.View style={[styles.imageContainer, animatedImageStyle]}>
+                            <Image
+                              source={{ uri: imageUrl }}
+                              style={styles.fullScreenImage}
+                              resizeMode="contain"
+                            />
+                          </Animated.View>
+                        </GestureDetector>
+                      </View>
+                    ))}
+                  </ScrollView>
+
+                  {/* Image Navigation Dots */}
+                  {currentImages.length > 1 && (
+                    <View style={styles.imageViewerDots}>
+                      {currentImages.map((_, index) => (
+                        <View
+                          key={index}
+                          style={[
+                            styles.imageViewerDot,
+                            selectedImageIndex === index && styles.activeImageViewerDot
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  )}
+                </SafeAreaView>
+                </GestureHandlerRootView>
+              </Modal>
+
+              {/* Timeline */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Timeline</Text>
+                <View style={styles.timelineItem}>
+                  <View style={styles.timelineIcon}>
+                    <Ionicons name="add-circle" size={20} color="#2196F3" />
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineTitle}>Report Submitted</Text>
+                    <Text style={styles.timelineDate}>
+                      {formatDate(selectedReport.createdAt).date} at {formatDate(selectedReport.createdAt).time}
+                    </Text>
+                  </View>
+                </View>
+
+                {selectedReport.resolvedAt && (
+                  <View style={styles.timelineItem}>
+                    <View style={styles.timelineIcon}>
+                      <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                    </View>
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.timelineTitle}>Report Resolved</Text>
+                      <Text style={styles.timelineDate}>
+                        {formatDate(selectedReport.resolvedAt).date} at {formatDate(selectedReport.resolvedAt).time}
+                      </Text>
+                      {selectedReport.timeTakenToResolve && (
+                        <Text style={styles.timelineNote}>
+                          Resolved in {Math.ceil(selectedReport.timeTakenToResolve / (1000 * 60 * 60 * 24))} days
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+              </View>
+            </ScrollView>
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -600,5 +1109,297 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#CCCCCC',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666666',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  refreshButton: {
+    padding: 4,
+  },
+  priorityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  priorityText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 2,
+    textTransform: 'capitalize',
+  },
+  reportDescription: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 4,
+    lineHeight: 20,
+  },
+  resolvedText: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333333',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  modalSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 12,
+  },
+  modalReportHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  modalReportInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  modalReportId: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginRight: 8,
+  },
+  modalReportTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  modalReportDescription: {
+    fontSize: 15,
+    color: '#6B7280',
+    lineHeight: 22,
+  },
+  modalLocationText: {
+    fontSize: 15,
+    color: '#374151',
+    lineHeight: 22,
+  },
+  mediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  mediaItem: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F3F4F6',
+  },
+  mediaImage: {
+    width: '100%',
+    height: '100%',
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    marginBottom: 16,
+  },
+  timelineIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 2,
+  },
+  timelineDate: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  timelineNote: {
+    fontSize: 12,
+    color: '#10B981',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  // Audio Player Styles
+  audioPlayerContainer: {
+    marginTop: 12,
+  },
+  audioPlayer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  audioInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  audioText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333333',
+  },
+  audioTime: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 2,
+  },
+  audioProgressContainer: {
+    marginTop: 8,
+  },
+  audioProgressBar: {
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  audioProgressFill: {
+    height: '100%',
+    backgroundColor: '#FF6B35',
+    borderRadius: 2,
+  },
+  // Media Overlay Styles
+  mediaOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  // Modal Detail Row Styles
+  modalDetailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalDetailText: {
+    fontSize: 14,
+    color: '#333333',
+    marginLeft: 12,
+    flex: 1,
+  },
+  // Image Viewer Styles
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  imageViewerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  imageViewerCloseButton: {
+    padding: 8,
+  },
+  imageViewerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  imageViewerResetButton: {
+    padding: 8,
+  },
+  imageViewerSlide: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height - 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageContainer: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height - 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageViewerDots: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  imageViewerDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    marginHorizontal: 4,
+  },
+  activeImageViewerDot: {
+    backgroundColor: '#FFFFFF',
   },
 });

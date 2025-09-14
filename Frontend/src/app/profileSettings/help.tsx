@@ -103,21 +103,21 @@ export default function HelpSupport() {
     {
       id: 'call',
       title: 'Call Support',
-      subtitle: 'Speak to our team',
+      subtitle: '',
       icon: 'call',
       action: handleCallSupport,
     },
     {
       id: 'email',
       title: 'Email Support',
-      subtitle: 'Send us a message',
+      subtitle: '',
       icon: 'mail',
       action: handleEmailSupport,
     },
     {
       id: 'chat',
-      title: 'Live Chat',
-      subtitle: 'Chat with support',
+      title: 'Chat',
+      subtitle: '',
       icon: 'chatbubble',
       action: () => Alert.alert('Coming Soon', 'Live chat will be available soon!'),
     },
@@ -221,7 +221,7 @@ export default function HelpSupport() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.infoSection}>
+        {/* <View style={styles.infoSection}>
           <Text style={styles.infoTitle}>Support Hours</Text>
           <Text style={styles.infoText}>
             Monday - Friday: 9:00 AM - 6:00 PM IST
@@ -232,7 +232,7 @@ export default function HelpSupport() {
           <Text style={styles.infoText}>
             Sunday: Closed
           </Text>
-        </View>
+        </View> */}
       </ScrollView>
     </SafeAreaView>
   );
