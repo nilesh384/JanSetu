@@ -208,48 +208,48 @@ export const getReportById = async (reportId) => {
  * @param {string} userId - User ID (for authorization)
  * @returns {Promise<Object>} Response object
  */
-export const deleteReport = async (reportId, userId) => {
-  try {
-    console.log('🗑️ Deleting report:', reportId, 'by user:', userId);
-    console.log('📡 API URL:', `${API_BASE_URL}/reports/${reportId}`);
+// export const deleteReport = async (reportId, userId) => {
+//   try {
+//     console.log('🗑️ Deleting report:', reportId, 'by user:', userId);
+//     console.log('📡 API URL:', `${API_BASE_URL}/reports/${reportId}`);
     
-    const response = await fetch(`${API_BASE_URL}/reports/${reportId}?userId=${userId}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+//     const response = await fetch(`${API_BASE_URL}/reports/${reportId}?userId=${userId}`, {
+//       method: 'DELETE',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//     });
 
-    console.log('📥 Response status:', response.status);
+//     console.log('📥 Response status:', response.status);
     
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
+//     let data;
+//     try {
+//       data = await response.json();
+//     } catch (parseError) {
+//       console.error('❌ JSON parse error:', parseError);
+//       throw new Error('Invalid response from server');
+//     }
     
-    console.log('📄 Response data:', data);
+//     console.log('📄 Response data:', data);
 
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to delete report');
-    }
+//     if (!response.ok) {
+//       throw new Error(data.message || 'Failed to delete report');
+//     }
 
-    return {
-      success: true,
-      message: data.message
-    };
+//     return {
+//       success: true,
+//       message: data.message
+//     };
 
-  } catch (error) {
-    console.error('❌ Error deleting report:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
-  }
-};
+//   } catch (error) {
+//     console.error('❌ Error deleting report:', error);
+//     return {
+//       success: false,
+//       message: error.message || 'Network error. Please check your connection.',
+//       error: error
+//     };
+//   }
+// };
 
 /**
  * Get nearby reports based on location
