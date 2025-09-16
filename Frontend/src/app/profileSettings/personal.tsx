@@ -15,6 +15,7 @@ import {
 
 import { useAuth } from '@/src/context/AuthContext';
 import { updateUserProfile } from '@/src/api/user';
+import UniversalHeader from '@/src/components/UniversalHeader';
 
 export default function PersonalInfo() {
     const { user, logout, refreshUser } = useAuth();
@@ -97,16 +98,7 @@ export default function PersonalInfo() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Personal Information</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <UniversalHeader title="Personal Information" showBackButton={true} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>

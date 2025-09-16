@@ -18,12 +18,14 @@ app.use(cookieParser())
 import userRouter from "./routes/users.routes.js";
 import otpRouter from "./routes/otp.routes.js";
 import reportsRouter from "./routes/reports.routes.js";
+import healthRouter from "./routes/health.routes.js";
 
 
 //routes declaration
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/otp", otpRouter);
 app.use("/api/v1/reports", reportsRouter);
+app.use("/api/v1/health", healthRouter);
 
 
 
@@ -32,9 +34,71 @@ app.get("/", (req, res) => {
 });
 
 
-// Error middleware (keep this last in the middleware chain)
+// Database error handling middleware
 app.use((err, req, res, next) => {
+    // Log the error for debugging
+    console.error('🚨 Error caught by middleware:', {
+        message: err.message,
+        code: err.code,
+        url: req.url,
+        method: req.method,
+        timestamp: new Date().toISOString()
+    });
+
+    // Database connection errors
+    if (err.message && err.message.includes('Database connection unavailable')) {
+        return res.status(503).json({
+            success: false,
+            message: 'Database temporarily unavailable. Please try again later.',
+            error: 'DATABASE_UNAVAILABLE',
+            retryAfter: 30 // seconds
+        });
+    }
+
+    // PostgreSQL specific errors
+    if (err.code) {
+        switch (err.code) {
+            case 'ENOTFOUND':
+                return res.status(503).json({
+                    success: false,
+                    message: 'Database server not reachable',
+                    error: 'DATABASE_DNS_ERROR'
+                });
+            case 'ECONNREFUSED':
+                return res.status(503).json({
+                    success: false,
+                    message: 'Database connection refused',
+                    error: 'DATABASE_CONNECTION_REFUSED'
+                });
+            case 'ETIMEDOUT':
+                return res.status(503).json({
+                    success: false,
+                    message: 'Database connection timeout',
+                    error: 'DATABASE_TIMEOUT'
+                });
+            case '28000': // Invalid authorization
+                return res.status(503).json({
+                    success: false,
+                    message: 'Database authentication failed',
+                    error: 'DATABASE_AUTH_ERROR'
+                });
+            case '57P03': // Cannot connect now
+                return res.status(503).json({
+                    success: false,
+                    message: 'Database is not ready to accept connections',
+                    error: 'DATABASE_NOT_READY'
+                });
+        }
+    }
+
+    // Default error handling
     const statusCode = err.statusCode || 500;
+
+    // Check if headers have already been sent
+    if (res.headersSent) {
+        console.error('⚠️ Headers already sent, cannot send error response:', err.message);
+        return;
+    }
 
     return res.status(statusCode).json({
         success: false,

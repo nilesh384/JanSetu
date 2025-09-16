@@ -491,3 +491,43 @@ export const resolveReport = async (reportId) => {
     };
   }
 };
+
+/**
+ * Get community statistics for the stats grid
+ * @returns {Promise<Object>} Response object with community stats
+ */
+export const getCommunityStats = async () => {
+  try {
+    console.log('📊 Fetching community statistics');
+    console.log('📡 API URL:', `${API_BASE_URL}/reports/community-stats`);
+
+    const response = await fetch(`${API_BASE_URL}/reports/community-stats`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to fetch community statistics');
+    }
+
+    console.log('📊 Community stats response:', data);
+
+    return {
+      success: true,
+      stats: data.stats,
+      message: data.message
+    };
+
+  } catch (error) {
+    console.error('❌ Error fetching community statistics:', error);
+    return {
+      success: false,
+      message: error.message || 'Network error. Please check your connection.',
+      error: error
+    };
+  }
+};

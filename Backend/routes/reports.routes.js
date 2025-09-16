@@ -8,6 +8,7 @@ import {
     deleteReport,
     getNearbyReports,
     getUserReportsStats,
+    getCommunityStats,
     uploadReportMedia,
     uploadSingleMedia
 } from '../controllers/reports.controller.js';
@@ -29,6 +30,7 @@ router.route('/upload-single-media').post(upload.single('mediaFile'), uploadSing
 router.route('/create').post(createReport);
 router.route('/user/:userId').get(getUserReports);
 router.route('/nearby').get(getNearbyReports);
+router.route('/community-stats').get(getCommunityStats);
 
 router.route('/:reportId').get(getReportById);
 router.route('/:reportId').put(updateReport);              //TODO: Restrict to report owner or admin

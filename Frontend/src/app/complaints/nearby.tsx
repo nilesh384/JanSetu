@@ -1,5 +1,5 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
   FlatList,
@@ -18,7 +18,7 @@ import {
   Dimensions,
 } from 'react-native';
 import * as Location from 'expo-location';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -33,6 +33,13 @@ import {
 
 import { getNearbyReports } from '@/src/api/report';
 import { useAuth } from '@/src/context/AuthContext';
+import UniversalHeader from '@/src/components/UniversalHeader';
+
+// Utility function to detect video files
+const isVideoFile = (url: string): boolean => {
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.3gp'];
+  return videoExtensions.some(ext => url.toLowerCase().endsWith(ext));
+};
 
 interface Report {
   id: string;
@@ -111,6 +118,7 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export default function NearbyComplaints() {
   const { user } = useAuth();
+  const router = useRouter();
   const { selectedReportId } = useLocalSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All');
@@ -133,6 +141,12 @@ export default function NearbyComplaints() {
   const [currentImages, setCurrentImages] = useState<string[]>([]);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isHorizontalScrollEnabled, setIsHorizontalScrollEnabled] = useState(true);
+
+  // Video player state
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoStatus, setVideoStatus] = useState<any>(null);
 
   // Animated values for zoom and pan
   const scale = useSharedValue(1);
@@ -451,14 +465,11 @@ export default function NearbyComplaints() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Nearby Complaints</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      {/* Universal Header */}
+      <UniversalHeader
+        title="Nearby Complaints"
+        showBackButton={true}
+      />
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -616,26 +627,42 @@ export default function NearbyComplaints() {
                   {/* Images/Videos */}
                   {selectedReport.mediaUrls.length > 0 && (
                     <View style={styles.mediaGrid}>
-                      {selectedReport.mediaUrls.map((url, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.mediaItem}
-                          onPress={() => {
-                            setCurrentImages(selectedReport.mediaUrls);
-                            setSelectedImageIndex(index);
-                            scale.value = 1; // Reset zoom when opening new image
-                            translateX.value = 0; // Reset pan position
-                            translateY.value = 0; // Reset pan position
-                            setIsHorizontalScrollEnabled(true); // Enable horizontal scrolling
-                            setShowImageViewer(true);
-                          }}
-                        >
-                          <Image source={{ uri: url }} style={styles.mediaImage} />
-                          <View style={styles.mediaOverlay}>
-                            <Ionicons name="expand-outline" size={24} color="#FFFFFF" />
-                          </View>
-                        </TouchableOpacity>
-                      ))}
+                      {selectedReport.mediaUrls.map((url, index) => {
+                        const isVideo = isVideoFile(url);
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.mediaItem}
+                            onPress={() => {
+                              if (isVideo) {
+                                setCurrentVideoUrl(url);
+                                setVideoLoading(true);
+                                setVideoStatus(null);
+                                setShowVideoPlayer(true);
+                              } else {
+                                setCurrentImages(selectedReport.mediaUrls);
+                                setSelectedImageIndex(index);
+                                scale.value = 1; // Reset zoom when opening new image
+                                translateX.value = 0; // Reset pan position
+                                translateY.value = 0; // Reset pan position
+                                setIsHorizontalScrollEnabled(true); // Enable horizontal scrolling
+                                setShowImageViewer(true);
+                              }
+                            }}
+                          >
+                            <Image source={{ uri: url }} style={styles.mediaImage} />
+                            <View style={styles.mediaOverlay}>
+                              {isVideo ? (
+                                <View style={styles.videoPlayButton}>
+                                  <Ionicons name="play-circle" size={32} color="#FFFFFF" />
+                                </View>
+                              ) : (
+                                <Ionicons name="expand-outline" size={24} color="#FFFFFF" />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   )}
 
@@ -765,6 +792,86 @@ export default function NearbyComplaints() {
                   )}
                 </SafeAreaView>
                 </GestureHandlerRootView>
+              </Modal>
+
+              {/* Video Player Modal */}
+              <Modal
+                visible={showVideoPlayer}
+                animationType="fade"
+                presentationStyle="fullScreen"
+                onRequestClose={() => {
+                  setShowVideoPlayer(false);
+                  setVideoLoading(false);
+                  setVideoStatus(null);
+                }}
+              >
+                <SafeAreaView style={styles.videoPlayerContainer}>
+                  <View style={styles.videoPlayerHeader}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setShowVideoPlayer(false);
+                        setVideoLoading(false);
+                        setVideoStatus(null);
+                      }}
+                      style={styles.videoPlayerCloseButton}
+                    >
+                      <Ionicons name="close" size={28} color="#FFFFFF" />
+                    </TouchableOpacity>
+                    <Text style={styles.videoPlayerTitle}>
+                      {videoLoading ? 'Loading Video...' : 'Video'}
+                    </Text>
+                    <View style={styles.headerPlaceholder} />
+                  </View>
+
+                  <View style={styles.videoPlayerContent}>
+                    {videoLoading && (
+                      <View style={styles.videoLoadingOverlay}>
+                        <ActivityIndicator size="large" color="#FFFFFF" />
+                        <Text style={styles.videoLoadingText}>Loading video...</Text>
+                      </View>
+                    )}
+
+                    <Video
+                      source={{ uri: currentVideoUrl }}
+                      style={styles.videoPlayer}
+                      useNativeControls
+                      resizeMode={ResizeMode.CONTAIN}
+                      shouldPlay={false}
+                      isLooping={false}
+                      shouldCorrectPitch={false}
+                      usePoster={false}
+                      posterSource={undefined}
+                      posterStyle={undefined}
+                      onLoadStart={() => {
+                        setVideoLoading(true);
+                        console.log('Video load started');
+                      }}
+                      onLoad={(status) => {
+                        setVideoLoading(false);
+                        setVideoStatus(status);
+                        console.log('Video loaded:', status);
+                      }}
+                      onError={(error) => {
+                        setVideoLoading(false);
+                        console.error('Video error:', error);
+                        Alert.alert('Video Error', 'Unable to load video. Please try again.');
+                      }}
+                      onPlaybackStatusUpdate={(status) => {
+                        setVideoStatus(status);
+                      }}
+                      progressUpdateIntervalMillis={250}
+                    />
+
+                    {videoStatus && !videoLoading && (
+                      <View style={styles.videoStatusOverlay}>
+                        <Text style={styles.videoStatusText}>
+                          {videoStatus.isBuffering ? 'Buffering...' :
+                           videoStatus.isPlaying ? 'Playing' : 'Paused'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </SafeAreaView>
               </Modal>
 
               {/* Timeline */}
@@ -1401,5 +1508,74 @@ const styles = StyleSheet.create({
   },
   activeImageViewerDot: {
     backgroundColor: '#FFFFFF',
+  },
+
+  // Video Player Styles
+  videoPlayerContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  videoPlayerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  videoPlayerCloseButton: {
+    padding: 8,
+  },
+  videoPlayerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  videoPlayerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+  },
+  videoLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  videoLoadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  videoStatusOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  videoStatusText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  videoPlayButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 25,
+    padding: 8,
   },
 });

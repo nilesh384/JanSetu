@@ -134,6 +134,8 @@ const createReport = async (req, res) => {
     }
 };
 
+
+
 // Get all reports for a specific user
 const getUserReports = async (req, res) => {
     try {
@@ -954,6 +956,81 @@ const uploadSingleMedia = async (req, res) => {
     }
 };
 
+const getCommunityStats = async (req, res) => {
+    let client;
+    try {
+        console.log('📊 Fetching community statistics');
+
+        client = await dbConnect();
+
+        const statsQuery = `
+            SELECT
+                COUNT(*) as total_reports,
+                COUNT(CASE WHEN is_resolved = true THEN 1 END) as resolved_reports,
+                ROUND(
+                    CASE
+                        WHEN COUNT(*) > 0 THEN
+                            (COUNT(CASE WHEN is_resolved = true THEN 1 END)::decimal / COUNT(*)::decimal) * 100
+                        ELSE 0
+                    END,
+                    1
+                ) as resolution_rate_percentage,
+                ROUND(
+                    AVG(
+                        CASE
+                            WHEN is_resolved = true AND resolved_at IS NOT NULL THEN
+                                EXTRACT(EPOCH FROM (resolved_at - created_at)) / 86400
+                            ELSE NULL
+                        END
+                    ),
+                    1
+                ) as avg_resolution_time_days
+            FROM reports
+        `;
+
+        const result = await client.query(statsQuery);
+        const stats = result.rows[0];
+
+        // Format the response to match the frontend expectations
+        const formattedStats = {
+            totalReports: parseInt(stats.total_reports) || 0,
+            resolvedReports: parseInt(stats.resolved_reports) || 0,
+            resolutionRate: parseFloat(stats.resolution_rate_percentage) || 0,
+            avgResponseTime: stats.avg_resolution_time_days ? `${stats.avg_resolution_time_days}` : '0.0'
+        };
+
+        console.log('✅ Community stats fetched successfully:', formattedStats);
+
+        res.status(200).json({
+            success: true,
+            message: 'Community statistics fetched successfully',
+            stats: formattedStats
+        });
+
+    } catch (error) {
+        console.error('❌ Error fetching community statistics:', error);
+
+        // Only send response if headers haven't been sent yet
+        if (!res.headersSent) {
+            res.status(500).json({
+                success: false,
+                message: 'Server error while fetching community statistics',
+                error: error.message
+            });
+        }
+    } finally {
+        // Properly close the client connection
+        if (client) {
+            try {
+                await client.end();
+                console.log('🔌 Database connection closed');
+            } catch (closeError) {
+                console.error('❌ Error closing database connection:', closeError);
+            }
+        }
+    }
+};
+
 export {
     createReport,
     getUserReports,
@@ -963,6 +1040,7 @@ export {
     deleteReport,
     getNearbyReports,
     getUserReportsStats,
+    getCommunityStats,
     uploadReportMedia,
     uploadSingleMedia
 };

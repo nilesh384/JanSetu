@@ -1,3 +1,4 @@
+import UniversalHeader from '@/src/components/UniversalHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
@@ -73,16 +74,7 @@ export default function About() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>About</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <UniversalHeader title="About" />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
