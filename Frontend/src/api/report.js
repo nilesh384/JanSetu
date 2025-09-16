@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import axios from 'axios';
 
 // API Base URL - Using VS Code dev tunnel from environment variable
 const getBaseURL = () => {
@@ -13,6 +14,15 @@ const getBaseURL = () => {
 };
 
 const API_BASE_URL = getBaseURL();
+
+// Create axios instance with base configuration
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000, // 10 second timeout
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
 /**
  * Create a new report
@@ -34,56 +44,55 @@ export const createReport = async (reportData) => {
   try {
     console.log('📝 Creating new report:', reportData.title);
     console.log('📡 API URL:', `${API_BASE_URL}/reports/create`);
-    
-    const response = await fetch(`${API_BASE_URL}/reports/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: reportData.userId,
-        title: reportData.title,
-        description: reportData.description,
-        category: reportData.category,
-        priority: reportData.priority,
-        mediaUrls: reportData.mediaUrls || [],
-        audioUrl: reportData.audioUrl || null,
-        latitude: reportData.latitude,
-        longitude: reportData.longitude,
-        address: reportData.address,
-        department: reportData.department
-      }),
+
+    const response = await apiClient.post('/reports/create', {
+      userId: reportData.userId,
+      title: reportData.title,
+      description: reportData.description,
+      category: reportData.category,
+      priority: reportData.priority,
+      mediaUrls: reportData.mediaUrls || [],
+      audioUrl: reportData.audioUrl || null,
+      latitude: reportData.latitude,
+      longitude: reportData.longitude,
+      address: reportData.address,
+      department: reportData.department
     });
 
     console.log('📥 Response status:', response.status);
-    
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
-    
-    console.log('📄 Response data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to create report');
-    }
+    console.log('📄 Response data:', response.data);
 
     return {
       success: true,
-      report: data.report,
-      message: data.message
+      report: response.data.report,
+      message: response.data.message
     };
 
   } catch (error) {
     console.error('❌ Error creating report:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to create report',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -99,57 +108,52 @@ export const createReport = async (reportData) => {
 export const getUserReports = async (userId, options = {}) => {
   try {
     console.log('📋 Fetching reports for user:', userId);
-    
+
     // Build query parameters
-    const queryParams = new URLSearchParams();
-    if (options.page) queryParams.append('page', options.page.toString());
-    if (options.limit) queryParams.append('limit', options.limit.toString());
-    if (options.status) queryParams.append('status', options.status);
-    
-    const queryString = queryParams.toString();
-    const url = `${API_BASE_URL}/reports/user/${userId}${queryString ? `?${queryString}` : ''}`;
-    
-    console.log('📡 API URL:', url);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const params = {};
+    if (options.page) params.page = options.page;
+    if (options.limit) params.limit = options.limit;
+    if (options.status) params.status = options.status;
 
-    console.log('📥 Response status:', response.status);
-    
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
-    
-    console.log('📄 Response data:', data);
+    const response = await apiClient.get(`/reports/user/${userId}`, { params });
 
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch user reports');
-    }
+    console.log('� Response status:', response.status);
+    console.log('📄 Response data:', response.data);
 
     return {
       success: true,
-      reports: data.reports,
-      total: data.total,
-      currentPage: data.currentPage,
-      totalPages: data.totalPages,
-      message: data.message
+      reports: response.data.reports,
+      total: response.data.total,
+      currentPage: response.data.currentPage,
+      totalPages: response.data.totalPages,
+      message: response.data.message
     };
 
   } catch (error) {
     console.error('❌ Error fetching user reports:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to fetch user reports',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -162,43 +166,43 @@ export const getReportById = async (reportId) => {
   try {
     console.log('🔍 Fetching report by ID:', reportId);
     console.log('📡 API URL:', `${API_BASE_URL}/reports/${reportId}`);
-    
-    const response = await fetch(`${API_BASE_URL}/reports/${reportId}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+
+    const response = await apiClient.get(`/reports/${reportId}`);
 
     console.log('📥 Response status:', response.status);
-    
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
-    
-    console.log('📄 Response data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch report');
-    }
+    console.log('� Response data:', response.data);
 
     return {
       success: true,
-      report: data.report,
-      message: data.message
+      report: response.data.report,
+      message: response.data.message
     };
 
   } catch (error) {
     console.error('❌ Error fetching report:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to fetch report',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -267,75 +271,72 @@ export const getReportById = async (reportId) => {
 export const getNearbyReports = async (location, radius = 5, options = {}) => {
   try {
     console.log('📍 Fetching nearby reports:', location, 'radius:', radius);
-    
+
     // Validate location object
     if (!location || typeof location.latitude === 'undefined' || typeof location.longitude === 'undefined') {
       throw new Error('Invalid location object. Must have latitude and longitude properties.');
     }
-    
+
     // Build query parameters
-    const queryParams = new URLSearchParams({
-      latitude: location.latitude.toString(),
-      longitude: location.longitude.toString(),
-      radius: radius.toString()
-    });
-    
-    if (options.page) queryParams.append('page', options.page.toString());
-    if (options.limit) queryParams.append('limit', options.limit.toString());
-    if (options.category) queryParams.append('category', options.category);
-    if (options.priority) queryParams.append('priority', options.priority);
-    
-    const url = `${API_BASE_URL}/reports/nearby?${queryParams.toString()}`;
-    console.log('📡 API URL:', url);
-    
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const params = {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      radius: radius
+    };
+
+    if (options.page) params.page = options.page;
+    if (options.limit) params.limit = options.limit;
+    if (options.category) params.category = options.category;
+    if (options.priority) params.priority = options.priority;
+
+    const response = await apiClient.get('/reports/nearby', { params });
 
     console.log('📥 Response status:', response.status);
-    
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
-    
-    console.log('📄 Response data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch nearby reports');
-    }
+    console.log('📄 Response data:', response.data);
 
     // Handle backend response structure
-    if (data && data.success && data.reports) {
+    if (response.data && response.data.success && response.data.reports) {
       return {
         success: true,
-        reports: data.reports || [],
-        total: data.reports ? data.reports.length : 0,
-        pagination: data.pagination || {},
-        message: data.message || 'Reports fetched successfully'
+        reports: response.data.reports || [],
+        total: response.data.reports ? response.data.reports.length : 0,
+        pagination: response.data.pagination || {},
+        message: response.data.message || 'Reports fetched successfully'
       };
     } else {
       return {
         success: false,
         reports: [],
         total: 0,
-        message: data.message || 'No reports found'
+        message: response.data?.message || 'No reports found'
       };
     }
 
   } catch (error) {
     console.error('❌ Error fetching nearby reports:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to fetch nearby reports',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -348,43 +349,43 @@ export const getUserReportsStats = async (userId) => {
   try {
     console.log('📊 Fetching report stats for user:', userId);
     console.log('📡 API URL:', `${API_BASE_URL}/reports/user/${userId}/stats`);
-    
-    const response = await fetch(`${API_BASE_URL}/reports/user/${userId}/stats`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+
+    const response = await apiClient.get(`/reports/user/${userId}/stats`);
 
     console.log('📥 Response status:', response.status);
-    
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
-    
-    console.log('📄 Response data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch user stats');
-    }
+    console.log('� Response data:', response.data);
 
     return {
       success: true,
-      stats: data.stats,
-      message: data.message
+      stats: response.data.stats,
+      message: response.data.message
     };
 
   } catch (error) {
     console.error('❌ Error fetching user stats:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to fetch user stats',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -399,47 +400,46 @@ export const updateReport = async (reportId, updateData, userId) => {
   try {
     console.log('✏️ Updating report:', reportId);
     console.log('📡 API URL:', `${API_BASE_URL}/reports/${reportId}`);
-    
-    const response = await fetch(`${API_BASE_URL}/reports/${reportId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...updateData,
-        userId: userId // For authorization
-      }),
+
+    const response = await apiClient.put(`/reports/${reportId}`, {
+      ...updateData,
+      userId: userId // For authorization
     });
 
     console.log('📥 Response status:', response.status);
-    
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
-    
-    console.log('📄 Response data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to update report');
-    }
+    console.log('📄 Response data:', response.data);
 
     return {
       success: true,
-      report: data.report,
-      message: data.message
+      report: response.data.report,
+      message: response.data.message
     };
 
   } catch (error) {
     console.error('❌ Error updating report:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to update report',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -452,33 +452,41 @@ export const getCommunityStats = async () => {
     console.log('📊 Fetching community statistics');
     console.log('📡 API URL:', `${API_BASE_URL}/reports/community-stats`);
 
-    const response = await fetch(`${API_BASE_URL}/reports/community-stats`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await apiClient.get('/reports/community-stats');
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to fetch community statistics');
-    }
-
-    console.log('📊 Community stats response:', data);
+    console.log('📥 Response status:', response.status);
+    console.log('� Response data:', response.data);
 
     return {
       success: true,
-      stats: data.stats,
-      message: data.message
+      stats: response.data.stats,
+      message: response.data.message
     };
 
   } catch (error) {
     console.error('❌ Error fetching community statistics:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to fetch community statistics',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };

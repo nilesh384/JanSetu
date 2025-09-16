@@ -10,7 +10,8 @@ import {
     getUserReportsStats,
     getCommunityStats,
     uploadReportMedia,
-    uploadSingleMedia
+    uploadSingleMedia,
+    getAdminReports
 } from '../controllers/reports.controller.js';
 import { upload } from '../middlewares/multer.middleware.js';
 
@@ -29,6 +30,7 @@ router.route('/upload-single-media').post(upload.single('mediaFile'), uploadSing
 // Report CRUD operations
 router.route('/create').post(createReport);
 router.route('/user/:userId').get(getUserReports);
+router.route('/admin/:adminId').get(getAdminReports);
 router.route('/nearby').get(getNearbyReports);
 router.route('/community-stats').get(getCommunityStats);
 

@@ -137,8 +137,6 @@ const createReport = async (req, res) => {
     }
 };
 
-
-
 // Get all reports for a specific user
 const getUserReports = async (req, res) => {
     try {
@@ -158,7 +156,15 @@ const getUserReports = async (req, res) => {
 
         try {
             // Build dynamic query based on filters
-            let baseQuery = `SELECT * FROM reports WHERE user_id = $1`;
+            let baseQuery = `
+                SELECT 
+                    r.*,
+                    admins.full_name as resolved_by,
+                    admins.role as resolved_by_role
+                FROM reports r
+                LEFT JOIN admins ON r.resolved_by_admin_id = admins.id
+                WHERE r.user_id = $1
+            `;
             const queryParams = [userId];
             let paramIndex = 2;
 
@@ -205,6 +211,8 @@ const getUserReports = async (req, res) => {
                 resolvedMediaUrls: report.resolved_media_urls,
                 resolutionNotes: report.resolution_note,
                 resolvedByAdminId: report.resolved_by_admin_id,
+                resolvedBy: report.resolved_by,
+                resolvedByRole: report.resolved_by_role,
                 timeTakenToResolve: report.time_taken_to_resolve
             }));
 
@@ -252,12 +260,24 @@ const getReportById = async (req, res) => {
         const client = await dbConnect();
 
         try {
-            let query = `SELECT * FROM reports WHERE id = $1`;
+            let query = `
+                SELECT
+                    r.*,
+                    users.full_name as user_name,
+                    users.email as user_email,
+                    users.phone_number as user_phone,
+                    admins.full_name as resolved_by,
+                    admins.role as resolved_by_role
+                FROM reports r
+                LEFT JOIN users ON r.user_id = users.id
+                LEFT JOIN admins ON r.resolved_by_admin_id = admins.id
+                WHERE r.id = $1
+            `;
             const queryParams = [reportId];
 
             // If userId is provided, ensure the report belongs to the user
             if (userId) {
-                query += ` AND user_id = $2`;
+                query += ` AND r.user_id = $2`;
                 queryParams.push(userId);
             }
 
@@ -276,6 +296,9 @@ const getReportById = async (req, res) => {
             const mappedReport = {
                 id: report.id,
                 userId: report.user_id,
+                userName: report.user_name,
+                userEmail: report.user_email,
+                userPhone: report.user_phone,
                 title: report.title,
                 description: report.description,
                 category: report.category,
@@ -292,6 +315,8 @@ const getReportById = async (req, res) => {
                 resolvedMediaUrls: report.resolved_media_urls,
                 resolutionNotes: report.resolution_note,
                 resolvedByAdminId: report.resolved_by_admin_id,
+                resolvedBy: report.resolved_by,
+                resolvedByRole: report.resolved_by_role,
                 timeTakenToResolve: report.time_taken_to_resolve
             };
 
@@ -1164,6 +1189,246 @@ const getCommunityStats = async (req, res) => {
     }
 };
 
+const getAdminReports = async (req, res) => {
+    try {
+        const { adminId } = req.params;
+        const {
+            isResolved,
+            category,
+            priority,
+            department,
+            limit = 50,
+            offset = 0,
+            status
+        } = req.query;
+
+        if (!adminId) {
+            return res.status(400).json({
+                success: false,
+                message: "Admin ID is required"
+            });
+        }
+
+        console.log('🔍 Fetching reports for admin:', adminId);
+
+        const client = await dbConnect();
+
+        try {
+            // First, get the admin's role and department
+            const adminQuery = `
+                SELECT role, department, is_active
+                FROM admins
+                WHERE id = $1 AND is_active = true
+            `;
+            const adminResult = await client.query(adminQuery, [adminId]);
+
+            if (adminResult.rows.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: "Admin not found or inactive"
+                });
+            }
+
+            const admin = adminResult.rows[0];
+            const adminRole = admin.role.toLowerCase();
+            const adminDepartment = admin.department;
+
+            console.log('👤 Admin role:', adminRole, 'Department:', adminDepartment);
+
+            // Build dynamic query based on role and filters
+            let baseQuery = `
+                SELECT
+                    r.*,
+                    u.full_name as user_name,
+                    u.phone_number as user_phone
+                FROM reports r
+                LEFT JOIN users u ON r.user_id = u.id
+                WHERE 1=1
+            `;
+            const queryParams = [];
+            let paramIndex = 1;
+
+            // Apply role-based filtering
+            if (adminRole === 'viewer') {
+                // Viewers can only see reports from their department
+                if (!adminDepartment) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "Viewer admin must have a department assigned"
+                    });
+                }
+                baseQuery += ` AND LOWER(r.department) = LOWER($${paramIndex})`;
+                queryParams.push(adminDepartment);
+                paramIndex++;
+            }
+            // Admins and super_admins can see all reports (no additional WHERE clause needed)
+
+            // Apply additional filters
+            if (isResolved !== undefined) {
+                baseQuery += ` AND r.is_resolved = $${paramIndex}`;
+                queryParams.push(isResolved === 'true');
+                paramIndex++;
+            }
+
+            if (category) {
+                baseQuery += ` AND r.category = $${paramIndex}`;
+                queryParams.push(category);
+                paramIndex++;
+            }
+
+            if (priority) {
+                baseQuery += ` AND r.priority = $${paramIndex}`;
+                queryParams.push(priority);
+                paramIndex++;
+            }
+
+            if (department && adminRole !== 'viewer') {
+                // Only allow department filtering for non-viewer roles
+                baseQuery += ` AND LOWER(r.department) = LOWER($${paramIndex})`;
+                queryParams.push(department);
+                paramIndex++;
+            }
+
+            if (status) {
+                baseQuery += ` AND r.status = $${paramIndex}`;
+                queryParams.push(status);
+                paramIndex++;
+            }
+
+            // Add ordering and pagination
+            baseQuery += ` ORDER BY r.created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+            queryParams.push(parseInt(limit), parseInt(offset));
+
+            console.log('📋 Final query:', baseQuery);
+            console.log('📋 Query params:', queryParams);
+
+            const result = await client.query(baseQuery, queryParams);
+
+            // Get total count for pagination - build separate count query
+            let countQuery = `
+                SELECT COUNT(*) as total
+                FROM reports r
+                LEFT JOIN users u ON r.user_id = u.id
+                WHERE 1=1
+            `;
+            const countParams = [];
+
+            // Apply the same filters for count query
+            let countParamIndex = 1;
+
+            // Apply role-based filtering for count
+            if (adminRole === 'viewer') {
+                if (!adminDepartment) {
+                    return res.status(403).json({
+                        success: false,
+                        message: "Viewer admin must have a department assigned"
+                    });
+                }
+                countQuery += ` AND LOWER(r.department) = LOWER($${countParamIndex})`;
+                countParams.push(adminDepartment);
+                countParamIndex++;
+            }
+
+            // Apply additional filters for count
+            if (isResolved !== undefined) {
+                countQuery += ` AND r.is_resolved = $${countParamIndex}`;
+                countParams.push(isResolved === 'true');
+                countParamIndex++;
+            }
+
+            if (category) {
+                countQuery += ` AND r.category = $${countParamIndex}`;
+                countParams.push(category);
+                countParamIndex++;
+            }
+
+            if (priority) {
+                countQuery += ` AND r.priority = $${countParamIndex}`;
+                countParams.push(priority);
+                countParamIndex++;
+            }
+
+            if (department && adminRole !== 'viewer') {
+                countQuery += ` AND LOWER(r.department) = LOWER($${countParamIndex})`;
+                countParams.push(department);
+                countParamIndex++;
+            }
+
+            if (status) {
+                countQuery += ` AND r.status = $${countParamIndex}`;
+                countParams.push(status);
+                countParamIndex++;
+            }
+
+            const countResult = await client.query(countQuery, countParams);
+            const totalCount = parseInt(countResult.rows[0]?.total || 0);
+
+            // Map all reports to camelCase
+            const mappedReports = result.rows.map(report => ({
+                id: report.id,
+                userId: report.user_id,
+                userName: report.user_name,
+                userPhone: report.user_phone,
+                title: report.title,
+                description: report.description,
+                category: report.category,
+                priority: report.priority,
+                mediaUrls: report.media_urls,
+                audioUrl: report.audio_url,
+                latitude: report.latitude,
+                longitude: report.longitude,
+                address: report.address,
+                department: report.department,
+                isResolved: report.is_resolved,
+                resolvedBy: report.resolved_by,
+                resolutionNote: report.resolution_note,
+                resolvedMediaUrls: report.resolved_media_urls,
+                timeTakenToResolve: report.time_taken_to_resolve,
+                status: report.status,
+                createdAt: report.created_at,
+                updatedAt: report.updated_at
+            }));
+
+            console.log(`✅ Found ${mappedReports.length} reports for admin ${adminId} (role: ${adminRole})`);
+
+            res.status(200).json({
+                success: true,
+                reports: mappedReports,
+                pagination: {
+                    total: totalCount,
+                    limit: parseInt(limit),
+                    offset: parseInt(offset),
+                    hasMore: (parseInt(offset) + parseInt(limit)) < totalCount
+                },
+                adminInfo: {
+                    role: adminRole,
+                    department: adminDepartment,
+                    canViewAllDepartments: adminRole !== 'viewer'
+                },
+                message: `Reports fetched successfully for ${adminRole}`
+            });
+
+        } finally {
+            // Properly close the client connection
+            if (client) {
+                try {
+                    await client.end();
+                    console.log('🔌 Database connection closed');
+                } catch (closeError) {
+                    console.error('❌ Error closing database connection:', closeError);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('❌ Error fetching admin reports:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Internal server error',
+            error: error.message
+        });
+    }
+};
+
 export {
     createReport,
     getUserReports,
@@ -1175,5 +1440,6 @@ export {
     getUserReportsStats,
     getCommunityStats,
     uploadReportMedia,
-    uploadSingleMedia
+    uploadSingleMedia,
+    getAdminReports
 };
