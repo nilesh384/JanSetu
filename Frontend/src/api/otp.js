@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import axios from 'axios';
 
 // API Base URL - Using VS Code dev tunnel from environment variable
 const getBaseURL = () => {
@@ -14,6 +15,15 @@ const getBaseURL = () => {
 
 const API_BASE_URL = getBaseURL();
 
+// Create axios instance with base configuration
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000, // 10 second timeout
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 /**
  * Send OTP to a phone number
  * @param {string} phoneNumber - 10-digit phone number
@@ -23,55 +33,45 @@ export const sendOTP = async (phoneNumber) => {
   try {
     console.log('🚀 Sending OTP to:', phoneNumber);
     console.log('📡 API URL:', `${API_BASE_URL}/otp/send`);
-    
-    const response = await fetch(`${API_BASE_URL}/otp/send`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phoneNumber: phoneNumber
-      }),
+
+    const response = await apiClient.post('/otp/send', {
+      phoneNumber: phoneNumber
     });
 
     console.log('📥 Response status:', response.status);
-    console.log('📄 Response headers:', response.headers);
-    
-    // Check if response has content before trying to parse JSON
-    const responseText = await response.text();
-    console.log('📄 Raw response:', responseText);
-    
-    if (!responseText) {
-      throw new Error('Empty response from server');
-    }
-    
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response format from server');
-    }
-    
-    console.log('📄 Parsed data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to send OTP');
-    }
+    console.log('📄 Response data:', response.data);
 
     return {
       success: true,
-      message: data.message,
-      messageSid: data.messageSid
+      message: response.data.message,
+      messageSid: response.data.messageSid
     };
 
   } catch (error) {
     console.error('Error sending OTP:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to send OTP',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -85,59 +85,49 @@ export const verifyOTP = async (phoneNumber, otp) => {
   try {
     console.log('🔍 Verifying OTP for:', phoneNumber);
     console.log('📡 API URL:', `${API_BASE_URL}/otp/verify`);
-    
-    const response = await fetch(`${API_BASE_URL}/otp/verify`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phoneNumber: phoneNumber,
-        otp: otp
-      }),
+
+    const response = await apiClient.post('/otp/verify', {
+      phoneNumber: phoneNumber,
+      otp: otp
     });
 
     console.log('📥 Verify response status:', response.status);
-    console.log('📄 Verify response headers:', response.headers);
-    
-    // Check if response has content before trying to parse JSON
-    const responseText = await response.text();
-    console.log('📄 Raw verify response:', responseText);
-    
-    if (!responseText) {
-      throw new Error('Empty response from server');
-    }
-    
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ JSON parse error in verify:', parseError);
-      throw new Error('Invalid response format from server');
-    }
-    
-    console.log('📄 Parsed verify data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to verify OTP');
-    }
+    console.log('📄 Verify response data:', response.data);
 
     return {
       success: true,
-      message: data.message,
-      user: data.user || null,
-      isNewUser: data.isNewUser || false,
-      requiresProfileSetup: data.requiresProfileSetup || false,
-      warning: data.warning || null
+      message: response.data.message,
+      user: response.data.user || null,
+      isNewUser: response.data.isNewUser || false,
+      requiresProfileSetup: response.data.requiresProfileSetup || false,
+      warning: response.data.warning || null
     };
 
   } catch (error) {
     console.error('❌ Error verifying OTP:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to verify OTP',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -147,49 +137,43 @@ export const verifyOTP = async (phoneNumber, otp) => {
  */
 export const sendTestOTP = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/otp/send-test`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await apiClient.post('/otp/send-test');
 
     console.log('📥 Test OTP response status:', response.status);
-    
-    // Check if response has content before trying to parse JSON
-    const responseText = await response.text();
-    console.log('📄 Raw test OTP response:', responseText);
-    
-    if (!responseText) {
-      throw new Error('Empty response from server');
-    }
-    
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ JSON parse error in test OTP:', parseError);
-      throw new Error('Invalid response format from server');
-    }
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to send test OTP');
-    }
+    console.log('📄 Test OTP response data:', response.data);
 
     return {
       success: true,
-      message: data.message,
-      testOTP: data.testOTP,
-      messageSid: data.messageSid
+      message: response.data.message,
+      testOTP: response.data.testOTP,
+      messageSid: response.data.messageSid
     };
 
   } catch (error) {
     console.error('Error sending test OTP:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to send test OTP',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
 
@@ -199,46 +183,40 @@ export const sendTestOTP = async () => {
  */
 export const getStoredOTPs = async () => {
   try {
-    const response = await fetch(`${API_BASE_URL}/otp/debug`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    const response = await apiClient.get('/otp/debug');
 
     console.log('📥 Debug OTPs response status:', response.status);
-    
-    // Check if response has content before trying to parse JSON
-    const responseText = await response.text();
-    console.log('📄 Raw debug response:', responseText);
-    
-    if (!responseText) {
-      throw new Error('Empty response from server');
-    }
-    
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      console.error('❌ JSON parse error in debug OTPs:', parseError);
-      throw new Error('Invalid response format from server');
-    }
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to get stored OTPs');
-    }
+    console.log('📄 Debug OTPs response data:', response.data);
 
     return {
       success: true,
-      data: data.data
+      data: response.data.data
     };
 
   } catch (error) {
     console.error('Error getting stored OTPs:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to get stored OTPs',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };

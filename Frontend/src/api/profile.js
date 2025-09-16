@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import axios from 'axios';
 
 // API Base URL - Using VS Code dev tunnel from environment variable
 const getBaseURL = () => {
@@ -14,6 +15,15 @@ const getBaseURL = () => {
 
 const API_BASE_URL = getBaseURL();
 
+// Create axios instance with base configuration
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000, // 10 second timeout
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 /**
  * Create user profile after OTP verification
  * @param {Object} profileData - Profile data object
@@ -27,35 +37,42 @@ export const createProfile = async (profileData) => {
   try {
     console.log('🚀 Creating profile for:', profileData.phoneNumber);
     console.log('📡 API URL:', `${API_BASE_URL}/profile/create`);
-    
-    const response = await fetch(`${API_BASE_URL}/profile/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(profileData),
-    });
+
+    const response = await apiClient.post('/profile/create', profileData);
 
     console.log('📥 Response status:', response.status);
-    const data = await response.json();
-    console.log('📄 Response data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to create profile');
-    }
+    console.log('📄 Response data:', response.data);
 
     return {
       success: true,
-      message: data.message,
-      user: data.user
+      message: response.data.message,
+      user: response.data.user
     };
 
   } catch (error) {
     console.error('Error creating profile:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
+
+    if (error.response) {
+      // Server responded with error status
+      return {
+        success: false,
+        message: error.response.data?.message || 'Failed to create profile',
+        error: error
+      };
+    } else if (error.request) {
+      // Network error
+      return {
+        success: false,
+        message: 'Network error. Please check your connection.',
+        error: error
+      };
+    } else {
+      // Other error
+      return {
+        success: false,
+        message: error.message || 'An unexpected error occurred',
+        error: error
+      };
+    }
   }
 };
