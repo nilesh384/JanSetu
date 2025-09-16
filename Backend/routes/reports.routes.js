@@ -38,6 +38,11 @@ router.route('/:reportId').delete(deleteReport);
 router.route('/user/:userId/stats').get(getUserReportsStats);   
 
 // Special operations
-router.route('/:reportId/resolve').patch(resolveReport);   // TODO: Restrict to admin only
+router.route('/:reportId/resolve').post(
+    upload.fields([
+        { name: 'resolvedPhotos', maxCount: 2 }
+    ]),
+    resolveReport
+);   // Admin only - allows photo uploads
 
 export default router;

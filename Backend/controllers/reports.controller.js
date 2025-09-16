@@ -111,6 +111,9 @@ const createReport = async (req, res) => {
                 isResolved: newReport.is_resolved,
                 createdAt: newReport.created_at,
                 resolvedAt: newReport.resolved_at,
+                resolvedMediaUrls: newReport.resolved_media_urls,
+                resolutionNotes: newReport.resolution_note,
+                resolvedByAdminId: newReport.resolved_by_admin_id,
                 timeTakenToResolve: newReport.time_taken_to_resolve
             };
 
@@ -199,6 +202,9 @@ const getUserReports = async (req, res) => {
                 isResolved: report.is_resolved,
                 createdAt: report.created_at,
                 resolvedAt: report.resolved_at,
+                resolvedMediaUrls: report.resolved_media_urls,
+                resolutionNotes: report.resolution_note,
+                resolvedByAdminId: report.resolved_by_admin_id,
                 timeTakenToResolve: report.time_taken_to_resolve
             }));
 
@@ -283,6 +289,9 @@ const getReportById = async (req, res) => {
                 isResolved: report.is_resolved,
                 createdAt: report.created_at,
                 resolvedAt: report.resolved_at,
+                resolvedMediaUrls: report.resolved_media_urls,
+                resolutionNotes: report.resolution_note,
+                resolvedByAdminId: report.resolved_by_admin_id,
                 timeTakenToResolve: report.time_taken_to_resolve
             };
 
@@ -464,6 +473,9 @@ const updateReport = async (req, res) => {
                 isResolved: updatedReport.is_resolved,
                 createdAt: updatedReport.created_at,
                 resolvedAt: updatedReport.resolved_at,
+                resolvedMediaUrls: updatedReport.resolved_media_urls,
+                resolutionNotes: updatedReport.resolution_note,
+                resolvedByAdminId: updatedReport.resolved_by_admin_id,
                 timeTakenToResolve: updatedReport.time_taken_to_resolve
             };
 
@@ -489,11 +501,14 @@ const updateReport = async (req, res) => {
     }
 };
 
-// Mark report as resolved
+// Mark report as resolved (Admin only)
 const resolveReport = async (req, res) => {
     try {
         const { reportId } = req.params;
-        const { userId } = req.body; // Optional: to ensure user owns the report
+        const { adminId, adminRole, resolutionNotes } = req.body;
+
+        // Get uploaded files
+        const resolvedPhotos = req.files && req.files.resolvedPhotos ? req.files.resolvedPhotos.map(file => file.path) : [];
 
         if (!reportId) {
             return res.status(400).json({
@@ -502,26 +517,62 @@ const resolveReport = async (req, res) => {
             });
         }
 
-        console.log('✅ Resolving report:', reportId);
+        if (!adminId || !adminRole) {
+            return res.status(400).json({
+                success: false,
+                message: "Admin ID and role are required"
+            });
+        }
+
+        // Validate admin role
+        const validRoles = ['viewer', 'admin', 'super_admin'];
+        if (!validRoles.includes(adminRole.toLowerCase())) {
+            return res.status(403).json({
+                success: false,
+                message: "Invalid admin role"
+            });
+        }
+
+        // Limit to maximum 2 photos
+        if (resolvedPhotos.length > 2) {
+            return res.status(400).json({
+                success: false,
+                message: "Maximum 2 photos allowed for resolution"
+            });
+        }
+
+        console.log('✅ Resolving report:', reportId, 'by admin:', adminId, 'with', resolvedPhotos.length, 'photos');
 
         const client = await dbConnect();
 
         try {
-            // Check if report exists and belongs to user (if userId provided)
-            let checkQuery = `SELECT * FROM reports WHERE id = $1`;
-            const checkParams = [reportId];
+            // Verify admin exists and is active
+            const adminCheckQuery = `SELECT id, role FROM admins WHERE id = $1 AND is_active = true`;
+            const adminResult = await client.query(adminCheckQuery, [adminId]);
 
-            if (userId) {
-                checkQuery += ` AND user_id = $2`;
-                checkParams.push(userId);
+            if (adminResult.rows.length === 0) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Admin not found or inactive"
+                });
             }
 
-            const existingReport = await client.query(checkQuery, checkParams);
+            const admin = adminResult.rows[0];
+            if (admin.role.toLowerCase() !== adminRole.toLowerCase()) {
+                return res.status(403).json({
+                    success: false,
+                    message: "Admin role mismatch"
+                });
+            }
+
+            // Check if report exists
+            const reportCheckQuery = `SELECT * FROM reports WHERE id = $1`;
+            const existingReport = await client.query(reportCheckQuery, [reportId]);
 
             if (existingReport.rows.length === 0) {
                 return res.status(404).json({
                     success: false,
-                    message: 'Report not found or access denied'
+                    message: 'Report not found'
                 });
             }
 
@@ -532,21 +583,84 @@ const resolveReport = async (req, res) => {
                 });
             }
 
-            // Mark as resolved
+            // Upload photos to Cloudinary if any
+            let resolvedMediaUrls = [];
+            if (resolvedPhotos.length > 0) {
+                console.log('📤 Uploading resolved photos to Cloudinary...');
+                for (const photoPath of resolvedPhotos) {
+                    try {
+                        console.log('📤 Uploading file:', photoPath);
+                        const cloudinaryResult = await uploadOnCloudinary(photoPath);
+                        if (cloudinaryResult && cloudinaryResult.url) {
+                            resolvedMediaUrls.push(cloudinaryResult.url);
+                            console.log('✅ Successfully uploaded:', cloudinaryResult.url);
+                            
+                            // Additional cleanup check - ensure file is deleted
+                            try {
+                                const fs = await import('fs');
+                                if (fs.existsSync(photoPath)) {
+                                    fs.unlinkSync(photoPath);
+                                    console.log('🧹 Extra cleanup completed for:', photoPath);
+                                } else {
+                                    console.log('📁 File already cleaned up by uploadOnCloudinary:', photoPath);
+                                }
+                            } catch (extraCleanupError) {
+                                console.error('⚠️ Extra cleanup failed (but upload succeeded):', photoPath, extraCleanupError);
+                            }
+                        } else {
+                            console.error('❌ Upload failed for:', photoPath);
+                            // Cleanup failed upload
+                            try {
+                                const fs = await import('fs');
+                                if (fs.existsSync(photoPath)) {
+                                    fs.unlinkSync(photoPath);
+                                    console.log('🧹 Cleaned up failed upload file:', photoPath);
+                                }
+                            } catch (cleanupError) {
+                                console.error('❌ Failed to cleanup failed upload file:', photoPath, cleanupError);
+                            }
+                        }
+                    } catch (uploadError) {
+                        console.error('❌ Error uploading photo:', photoPath, uploadError);
+                        // The uploadOnCloudinary function should handle cleanup, but let's be extra safe
+                        try {
+                            const fs = await import('fs');
+                            if (fs.existsSync(photoPath)) {
+                                fs.unlinkSync(photoPath);
+                                console.log('🧹 Manually cleaned up file after upload error:', photoPath);
+                            }
+                        } catch (cleanupError) {
+                            console.error('❌ Failed to cleanup file:', photoPath, cleanupError);
+                        }
+                    }
+                }
+                console.log('✅ Uploaded', resolvedMediaUrls.length, 'resolved photos out of', resolvedPhotos.length);
+            }
+
+            // Mark as resolved with photos
             const resolveQuery = `
-                UPDATE reports 
+                UPDATE reports
                 SET is_resolved = true,
-                    resolved_at = CURRENT_TIMESTAMP
+                    resolved_at = CURRENT_TIMESTAMP,
+                    resolved_media_urls = $2,
+                    resolution_note = $3,
+                    resolved_by_admin_id = $4,
+                    time_taken_to_resolve = AGE(CURRENT_TIMESTAMP, created_at)
                 WHERE id = $1
                 RETURNING *
             `;
 
-            const result = await client.query(resolveQuery, [reportId]);
+            const result = await client.query(resolveQuery, [
+                reportId,
+                resolvedMediaUrls.length > 0 ? resolvedMediaUrls : null,
+                resolutionNotes || null,
+                adminId
+            ]);
             const resolvedReport = result.rows[0];
 
             // Update user's resolved_reports count
             const updateUserQuery = `
-                UPDATE users 
+                UPDATE users
                 SET resolved_reports = resolved_reports + 1,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = $1
@@ -570,19 +684,38 @@ const resolveReport = async (req, res) => {
                 isResolved: resolvedReport.is_resolved,
                 createdAt: resolvedReport.created_at,
                 resolvedAt: resolvedReport.resolved_at,
+                resolvedMediaUrls: resolvedReport.resolved_media_urls,
+                resolutionNotes: resolvedReport.resolution_note,
+                resolvedByAdminId: resolvedReport.resolved_by_admin_id,
                 timeTakenToResolve: resolvedReport.time_taken_to_resolve
             };
 
-            console.log('✅ Report resolved successfully:', reportId);
+            console.log('✅ Report resolved successfully by admin:', adminId);
 
             res.status(200).json({
                 success: true,
                 message: 'Report marked as resolved',
-                report: mappedReport
+                report: mappedReport,
+                uploadedPhotos: resolvedMediaUrls.length
             });
 
         } finally {
-            client.end();
+            // Final cleanup - ensure all uploaded files are removed
+            if (resolvedPhotos && resolvedPhotos.length > 0) {
+                console.log('🧹 Final cleanup check for resolved photos...');
+                const fs = await import('fs');
+                for (const photoPath of resolvedPhotos) {
+                    try {
+                        if (fs.existsSync(photoPath)) {
+                            fs.unlinkSync(photoPath);
+                            console.log('🧹 Final cleanup removed:', photoPath);
+                        }
+                    } catch (finalCleanupError) {
+                        console.error('❌ Final cleanup failed for:', photoPath, finalCleanupError);
+                    }
+                }
+            }
+            client.release();
         }
 
     } catch (error) {

@@ -444,55 +444,6 @@ export const updateReport = async (reportId, updateData, userId) => {
 };
 
 /**
- * Mark a report as resolved (admin function)
- * @param {string} reportId - Report ID
- * @returns {Promise<Object>} Response object
- */
-export const resolveReport = async (reportId) => {
-  try {
-    console.log('✅ Resolving report:', reportId);
-    console.log('📡 API URL:', `${API_BASE_URL}/reports/${reportId}/resolve`);
-    
-    const response = await fetch(`${API_BASE_URL}/reports/${reportId}/resolve`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    console.log('📥 Response status:', response.status);
-    
-    let data;
-    try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('❌ JSON parse error:', parseError);
-      throw new Error('Invalid response from server');
-    }
-    
-    console.log('📄 Response data:', data);
-
-    if (!response.ok) {
-      throw new Error(data.message || 'Failed to resolve report');
-    }
-
-    return {
-      success: true,
-      report: data.report,
-      message: data.message
-    };
-
-  } catch (error) {
-    console.error('❌ Error resolving report:', error);
-    return {
-      success: false,
-      message: error.message || 'Network error. Please check your connection.',
-      error: error
-    };
-  }
-};
-
-/**
  * Get community statistics for the stats grid
  * @returns {Promise<Object>} Response object with community stats
  */
