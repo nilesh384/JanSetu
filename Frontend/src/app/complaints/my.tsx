@@ -1,5 +1,5 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import {
   FlatList,
@@ -20,7 +20,14 @@ import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-g
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useAuth } from '@/src/context/AuthContext';
 import { getUserReports } from '@/src/api/report';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
+import UniversalHeader from '@/src/components/UniversalHeader';
+
+// Utility function to detect video files
+const isVideoFile = (url: string): boolean => {
+  const videoExtensions = ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v', '.3gp'];
+  return videoExtensions.some(ext => url.toLowerCase().endsWith(ext));
+};
 
 interface Report {
   id: string;
@@ -80,6 +87,7 @@ const formatDate = (dateString: string) => {
 
 export default function MyComplaints() {
   const { user } = useAuth();
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All');
   const [reports, setReports] = useState<Report[]>([]);
@@ -99,6 +107,12 @@ export default function MyComplaints() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioDuration, setAudioDuration] = useState<number | null>(null);
   const [audioPosition, setAudioPosition] = useState<number | null>(null);
+
+  //video
+  const [showVideoPlayer, setShowVideoPlayer] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
+  const [videoLoading, setVideoLoading] = useState(false);
+  const [videoStatus, setVideoStatus] = useState<any>(null);
 
   //zoom in out
   const scale = useSharedValue(1);
@@ -403,16 +417,16 @@ export default function MyComplaints() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#333333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Reports</Text>
-        <TouchableOpacity onPress={() => fetchReports(true)} style={styles.refreshButton}>
-          <Ionicons name="refresh" size={24} color="#333333" />
-        </TouchableOpacity>
-      </View>
+      {/* Universal Header */}
+      <UniversalHeader
+        title="My Reports"
+        showBackButton={true}
+        rightComponent={
+          <TouchableOpacity onPress={() => fetchReports(true)} style={styles.refreshButton}>
+            <Ionicons name="refresh" size={24} color="#333333" />
+          </TouchableOpacity>
+        }
+      />
 
       {!user ? (
         <View style={styles.loadingContainer}>
@@ -524,7 +538,7 @@ export default function MyComplaints() {
       <Modal
         visible={showDetailModal}
         animationType="slide"
-        presentationStyle="pageSheet"
+        presentationStyle="overFullScreen"
         onRequestClose={() => setShowDetailModal(false)}
       >
         <SafeAreaView style={styles.modalContainer}>
@@ -533,7 +547,7 @@ export default function MyComplaints() {
               onPress={() => setShowDetailModal(false)}
               style={styles.modalCloseButton}
             >
-              <Ionicons name="close" size={24} color="#333333" />
+              <Ionicons name="arrow-back" size={24} color="#333333" />
             </TouchableOpacity>
             <Text style={styles.modalTitle}>Report Details</Text>
             <View style={styles.headerPlaceholder} />
@@ -570,26 +584,42 @@ export default function MyComplaints() {
                   {/* Images/Videos */}
                   {selectedReport.mediaUrls.length > 0 && (
                     <View style={styles.mediaGrid}>
-                      {selectedReport.mediaUrls.map((url, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.mediaItem}
-                          onPress={() => {
-                            setCurrentImages(selectedReport.mediaUrls);
-                            setSelectedImageIndex(index);
-                            scale.value = 1; // Reset zoom when opening new image
-                            translateX.value = 0; // Reset pan position
-                            translateY.value = 0; // Reset pan position
-                            setIsHorizontalScrollEnabled(true); // Enable horizontal scrolling
-                            setShowImageViewer(true);
-                          }}
-                        >
-                          <Image source={{ uri: url }} style={styles.mediaImage} />
-                          <View style={styles.mediaOverlay}>
-                            <Ionicons name="expand-outline" size={24} color="#FFFFFF" />
-                          </View>
-                        </TouchableOpacity>
-                      ))}
+                      {selectedReport.mediaUrls.map((url, index) => {
+                        const isVideo = isVideoFile(url);
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            style={styles.mediaItem}
+                            onPress={() => {
+                              if (isVideo) {
+                                setCurrentVideoUrl(url);
+                                setVideoLoading(true);
+                                setVideoStatus(null);
+                                setShowVideoPlayer(true);
+                              } else {
+                                setCurrentImages(selectedReport.mediaUrls);
+                                setSelectedImageIndex(index);
+                                scale.value = 1; // Reset zoom when opening new image
+                                translateX.value = 0; // Reset pan position
+                                translateY.value = 0; // Reset pan position
+                                setIsHorizontalScrollEnabled(true); // Enable horizontal scrolling
+                                setShowImageViewer(true);
+                              }
+                            }}
+                          >
+                            <Image source={{ uri: url }} style={styles.mediaImage} />
+                            <View style={styles.mediaOverlay}>
+                              {isVideo ? (
+                                <View style={styles.videoPlayButton}>
+                                  <Ionicons name="play-circle" size={32} color="#FFFFFF" />
+                                </View>
+                              ) : (
+                                <Ionicons name="expand-outline" size={24} color="#FFFFFF" />
+                              )}
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   )}
 
@@ -667,6 +697,86 @@ export default function MyComplaints() {
                       )}
                     </SafeAreaView>
                     </GestureHandlerRootView>
+                  </Modal>
+
+                  {/* Video Player Modal */}
+                  <Modal
+                    visible={showVideoPlayer}
+                    animationType="fade"
+                    presentationStyle="fullScreen"
+                    onRequestClose={() => {
+                      setShowVideoPlayer(false);
+                      setVideoLoading(false);
+                      setVideoStatus(null);
+                    }}
+                  >
+                    <SafeAreaView style={styles.videoPlayerContainer}>
+                      <View style={styles.videoPlayerHeader}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setShowVideoPlayer(false);
+                            setVideoLoading(false);
+                            setVideoStatus(null);
+                          }}
+                          style={styles.videoPlayerCloseButton}
+                        >
+                          <Ionicons name="close" size={28} color="#FFFFFF" />
+                        </TouchableOpacity>
+                        <Text style={styles.videoPlayerTitle}>
+                          {videoLoading ? 'Loading Video...' : 'Video'}
+                        </Text>
+                        <View style={styles.headerPlaceholder} />
+                      </View>
+
+                      <View style={styles.videoPlayerContent}>
+                        {videoLoading && (
+                          <View style={styles.videoLoadingOverlay}>
+                            <ActivityIndicator size="large" color="#FFFFFF" />
+                            <Text style={styles.videoLoadingText}>Loading video...</Text>
+                          </View>
+                        )}
+
+                        <Video
+                          source={{ uri: currentVideoUrl }}
+                          style={styles.videoPlayer}
+                          useNativeControls
+                          resizeMode={ResizeMode.CONTAIN}
+                          shouldPlay={false}
+                          isLooping={false}
+                          shouldCorrectPitch={false}
+                          usePoster={false}
+                          posterSource={undefined}
+                          posterStyle={undefined}
+                          onLoadStart={() => {
+                            setVideoLoading(true);
+                            console.log('Video load started');
+                          }}
+                          onLoad={(status) => {
+                            setVideoLoading(false);
+                            setVideoStatus(status);
+                            console.log('Video loaded:', status);
+                          }}
+                          onError={(error) => {
+                            setVideoLoading(false);
+                            console.error('Video error:', error);
+                            Alert.alert('Video Error', 'Unable to load video. Please try again.');
+                          }}
+                          onPlaybackStatusUpdate={(status) => {
+                            setVideoStatus(status);
+                          }}
+                          progressUpdateIntervalMillis={250}
+                        />
+
+                        {videoStatus && !videoLoading && (
+                          <View style={styles.videoStatusOverlay}>
+                            <Text style={styles.videoStatusText}>
+                              {videoStatus.isBuffering ? 'Buffering...' :
+                               videoStatus.isPlaying ? 'Playing' : 'Paused'}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </SafeAreaView>
                   </Modal>
 
                   {/* Audio */}
@@ -786,26 +896,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8F9FA',
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  backButton: {
-    padding: 4,
-  },
   refreshButton: {
     padding: 4,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
   },
   headerAction: {
     padding: 4,
@@ -1118,17 +1210,22 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8F9FA',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
     backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   modalCloseButton: {
     padding: 4,
@@ -1140,31 +1237,33 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 16,
   },
   modalReportHeader: {
-    backgroundColor: '#FFFFFF',
-    padding: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: 12,
   },
   modalReportInfo: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    flexWrap: 'wrap',
   },
   modalReportId: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#374151',
+    marginRight: 8,
   },
   modalSection: {
     backgroundColor: '#FFFFFF',
-    marginTop: 12,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   modalSectionTitle: {
     fontSize: 16,
@@ -1174,14 +1273,14 @@ const styles = StyleSheet.create({
   },
   modalReportTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontWeight: 'bold',
+    color: '#374151',
     marginBottom: 8,
     lineHeight: 26,
   },
   modalReportDescription: {
     fontSize: 15,
-    color: '#4B5563',
+    color: '#6B7280',
     lineHeight: 22,
   },
   mediaGrid: {
@@ -1210,6 +1309,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  videoPlayButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 25,
+    padding: 8,
   },
   modalDetailRow: {
     flexDirection: 'row',
@@ -1350,6 +1454,70 @@ const styles = StyleSheet.create({
     width: 12,
     height: 8,
     borderRadius: 4,
+  },
+
+  // Video Player Styles
+  videoPlayerContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  videoPlayerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+  },
+  videoPlayerCloseButton: {
+    padding: 8,
+  },
+  videoPlayerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  videoPlayerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlayer: {
+    width: '100%',
+    height: '100%',
+  },
+  videoLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  videoLoadingText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  videoStatusOverlay: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  videoStatusText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '500',
   },
 
   // Audio Player Styles

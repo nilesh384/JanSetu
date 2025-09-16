@@ -4,26 +4,37 @@ import { router } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
 import * as Location from 'expo-location';
-import { getNearbyReports } from '@/src/api/report';
+import { getNearbyReports, getCommunityStats } from '@/src/api/report';
 import { useAuth } from '@/src/context/AuthContext';
+import { Report } from '@/src/types/report';
 
-interface Report {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  priority: string;
-  address: string;
-  isResolved: boolean;
-  createdAt: string;
+interface ExtendedReport extends Report {
   distance?: number;
+}
+
+interface CommunityStatsResponse {
+  success: boolean;
+  stats?: {
+    totalReports: number;
+    resolvedReports: number;
+    resolutionRate: number;
+    avgResponseTime: string;
+  };
+  message?: string;
 }
 
 export default function Home() {
   const { user } = useAuth();
-  const [nearbyReports, setNearbyReports] = useState<Report[]>([]);
+  const [nearbyReports, setNearbyReports] = useState<ExtendedReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [communityStats, setCommunityStats] = useState({
+    reportsSubmitted: 0,
+    issuesResolved: 0,
+    resolutionRate: '0%',
+    avgResponseTime: '0.0'
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
 
   const formatTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -103,6 +114,29 @@ export default function Home() {
     }
   };
 
+  const fetchCommunityStats = async () => {
+    try {
+      setStatsLoading(true);
+      const response = await getCommunityStats() as CommunityStatsResponse;
+      if (response.success && response.stats) {
+        setCommunityStats({
+          reportsSubmitted: response.stats.totalReports || 0,
+          issuesResolved: response.stats.resolvedReports || 0,
+          resolutionRate: `${response.stats.resolutionRate || 0}%`,
+          avgResponseTime: response.stats.avgResponseTime || '0.0'
+        });
+      } else {
+        // Keep default values if response is not successful
+        console.warn('Community stats response not successful:', response);
+      }
+    } catch (error) {
+      console.error('Error fetching community stats:', error);
+      // Keep default values on error
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   useEffect(() => {
     getUserLocation();
   }, []);
@@ -112,6 +146,10 @@ export default function Home() {
       fetchNearbyReports();
     }
   }, [userLocation]);
+
+  useEffect(() => {
+    fetchCommunityStats();
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -241,19 +279,35 @@ export default function Home() {
 
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>1,247</Text>
+                {statsLoading ? (
+                  <ActivityIndicator size="small" color="#3B82F6" />
+                ) : (
+                  <Text style={styles.statNumber}>{(communityStats.reportsSubmitted || 0).toLocaleString()}</Text>
+                )}
                 <Text style={styles.statLabel}>Reports Submitted</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>892</Text>
+                {statsLoading ? (
+                  <ActivityIndicator size="small" color="#059669" />
+                ) : (
+                  <Text style={styles.statNumber}>{(communityStats.issuesResolved || 0).toLocaleString()}</Text>
+                )}
                 <Text style={styles.statLabel}>Issues Resolved</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>72%</Text>
+                {statsLoading ? (
+                  <ActivityIndicator size="small" color="#D97706" />
+                ) : (
+                  <Text style={styles.statNumber}>{communityStats.resolutionRate || '0%'}</Text>
+                )}
                 <Text style={styles.statLabel}>Resolution Rate</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statNumber}>3.2</Text>
+                {statsLoading ? (
+                  <ActivityIndicator size="small" color="#DC2626" />
+                ) : (
+                  <Text style={styles.statNumber}>{communityStats.avgResponseTime || '0.0'}</Text>
+                )}
                 <Text style={styles.statLabel}>Avg. Response Time</Text>
               </View>
             </View>

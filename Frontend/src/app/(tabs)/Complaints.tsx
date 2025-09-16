@@ -1,5 +1,4 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import React from 'react';
 import {
     SafeAreaView,
@@ -10,6 +9,7 @@ import {
     View
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import UniversalHeader from '@/src/components/UniversalHeader';
 
 interface Report {
   id: string;
@@ -25,89 +25,12 @@ interface Report {
   estimatedResolution?: string;
 }
 
-const myReports: Report[] = [
-  {
-    id: 'RPT001',
-    title: 'Large Pothole on Main Street',
-    category: 'Road Issues',
-    location: 'Main Street, Sector 12',
-    status: 'in-progress',
-    priority: 'high',
-    submittedDate: '2025-09-08',
-    updatedDate: '2025-09-09',
-    description: 'There is a large pothole on the main road that could cause accidents.',
-    departmentAssigned: 'Public Works Department',
-    estimatedResolution: '2025-09-12'
-  },
-  {
-    id: 'RPT004',
-    title: 'Water Supply Disruption',
-    category: 'Water Supply',
-    location: 'Residential Area, Block A',
-    status: 'submitted',
-    priority: 'high',
-    submittedDate: '2025-09-09',
-    updatedDate: '2025-09-09',
-    description: 'No water supply for the past two days.',
-  }
-];
 
-const nearbyReports: Report[] = [
-  {
-    id: 'RPT002',
-    title: 'Broken Street Light',
-    category: 'Street Lighting',
-    location: 'Park Road, Gate No. 3',
-    status: 'acknowledged',
-    priority: 'medium',
-    submittedDate: '2025-09-07',
-    updatedDate: '2025-09-08',
-    description: 'Street light is not working, creating safety concerns at night.',
-    departmentAssigned: 'Electrical Department',
-    estimatedResolution: '2025-09-15'
-  },
-  {
-    id: 'RPT003',
-    title: 'Uncollected Garbage',
-    category: 'Waste Management',
-    location: 'Market Area, Shop No. 45',
-    status: 'resolved',
-    priority: 'medium',
-    submittedDate: '2025-09-05',
-    updatedDate: '2025-09-06',
-    description: 'Garbage has been accumulating for three days.',
-    departmentAssigned: 'Sanitation Department'
-  },
-  {
-    id: 'RPT005',
-    title: 'Illegal Parking Issue',
-    category: 'Traffic',
-    location: 'Commercial Complex, Block C',
-    status: 'submitted',
-    priority: 'low',
-    submittedDate: '2025-09-10',
-    updatedDate: '2025-09-10',
-    description: 'Vehicles parked illegally blocking the main entrance.',
-    departmentAssigned: 'Traffic Department'
-  },
-  {
-    id: 'RPT006',
-    title: 'Tree Branch Blocking Road',
-    category: 'Road Issues',
-    location: 'Green Avenue, Near School',
-    status: 'in-progress',
-    priority: 'medium',
-    submittedDate: '2025-09-09',
-    updatedDate: '2025-09-10',
-    description: 'Large tree branch fell and is blocking half the road.',
-    departmentAssigned: 'Public Works Department',
-    estimatedResolution: '2025-09-11'
-  }
-];
 
 export default function IssueTracker() {
 
   const router = useRouter();
+
   const handleNavigateToMyComplaints = () => {
     router.push('/complaints/my' as any);
   };
@@ -118,13 +41,7 @@ export default function IssueTracker() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity  onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="black"/>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Issue Tracker</Text>
-      </View>
+      
 
       <ScrollView style={styles.content}>
 
@@ -193,25 +110,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
     marginBottom: 70
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    marginTop: 30,
-  },
-  headerTitle: {
-    flex:1,
-    textAlign: 'center',
-    marginLeft: -24,
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333333',
-  },
   newReportButton: {
     backgroundColor: '#FF6B35',
     borderRadius: 20,
@@ -219,7 +117,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    marginTop: 16,
+    marginTop: 66,
   },
   welcomeSection: {
     paddingHorizontal: 20,

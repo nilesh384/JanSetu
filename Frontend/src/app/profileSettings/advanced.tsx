@@ -14,6 +14,7 @@ import {
 
 import { useAuth } from '@/src/context/AuthContext';
 import { deleteUser } from '@/src/api/user';
+import UniversalHeader from '@/src/components/UniversalHeader';
 
 interface AdvancedSetting {
   id: string;
@@ -179,16 +180,7 @@ export default function Advanced() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color="#333333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Advanced Settings</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <UniversalHeader title="Advanced Settings" />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* <View style={styles.warningSection}>

@@ -1,3 +1,4 @@
+import UniversalHeader from '@/src/components/UniversalHeader';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
@@ -144,120 +145,126 @@ export default function Social() {
   );
 
   return (
+    // <SafeAreaView style={styles.container}>
+    //   <ScrollView style={styles.scrollContainer}>
+        
+
+    //     {/* Statistics */}
+    //     <View style={styles.statsContainer}>
+    //       <View style={styles.statItem}>
+    //         <Text style={styles.statNumber}>247</Text>
+    //         <Text style={styles.statLabel}>Total Reports</Text>
+    //       </View>
+    //       <View style={styles.statItem}>
+    //         <Text style={styles.statNumber}>89</Text>
+    //         <Text style={styles.statLabel}>Active Issues</Text>
+    //       </View>
+    //       <View style={styles.statItem}>
+    //         <Text style={styles.statNumber}>158</Text>
+    //         <Text style={styles.statLabel}>Resolved</Text>
+    //       </View>
+    //       <View style={styles.statItem}>
+    //         <Text style={styles.statNumber}>1.2K</Text>
+    //         <Text style={styles.statLabel}>Community</Text>
+    //       </View>
+    //     </View>
+
+    //     {/* Filter Tabs */}
+    //     <View style={styles.tabContainer}>
+    //       <TouchableOpacity
+    //         style={[styles.tab, activeTab === 'all' && styles.activeTab]}
+    //         onPress={() => setActiveTab('all')}
+    //       >
+    //         <Ionicons
+    //           name="list"
+    //           size={20}
+    //           color={activeTab === 'all' ? '#FFFFFF' : '#666666'}
+    //         />
+    //         <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
+    //           All Posts
+    //         </Text>
+    //       </TouchableOpacity>
+    //       <TouchableOpacity
+    //         style={[styles.tab, activeTab === 'trending' && styles.activeTab]}
+    //         onPress={() => setActiveTab('trending')}
+    //       >
+    //         <Ionicons
+    //           name="trending-up"
+    //           size={20}
+    //           color={activeTab === 'trending' ? '#FFFFFF' : '#666666'}
+    //         />
+    //         <Text style={[styles.tabText, activeTab === 'trending' && styles.activeTabText]}>
+    //           Trending
+    //         </Text>
+    //       </TouchableOpacity>
+    //       <TouchableOpacity
+    //         style={[styles.tab, activeTab === 'activity' && styles.activeTab]}
+    //         onPress={() => setActiveTab('activity')}
+    //       >
+    //         <Ionicons
+    //           name="person"
+    //           size={20}
+    //           color={activeTab === 'activity' ? '#FFFFFF' : '#666666'}
+    //         />
+    //         <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
+    //           My Activity
+    //         </Text>
+    //       </TouchableOpacity>
+    //       <TouchableOpacity
+    //         style={[styles.tab, activeTab === 'nearby' && styles.activeTab]}
+    //         onPress={() => setActiveTab('nearby')}
+    //       >
+    //         <Ionicons
+    //           name="location"
+    //           size={20}
+    //           color={activeTab === 'nearby' ? '#FFFFFF' : '#666666'}
+    //         />
+    //         <Text style={[styles.tabText, activeTab === 'nearby' && styles.activeTabText]}>
+    //           Nearby
+    //         </Text>
+    //       </TouchableOpacity>
+    //     </View>
+
+    //     {/* Quick Actions */}
+    //     <View style={styles.quickActions}>
+    //       <TouchableOpacity style={styles.quickAction}>
+    //         <Ionicons name="add-circle" size={32} color="#FF6B35" />
+    //         <Text style={styles.quickActionText}>Report Issue</Text>
+    //       </TouchableOpacity>
+    //       <TouchableOpacity style={styles.quickAction}>
+    //         <Ionicons name="map" size={32} color="#FF6B35" />
+    //         <Text style={styles.quickActionText}>View Map</Text>
+    //       </TouchableOpacity>
+    //       <TouchableOpacity style={styles.quickAction}>
+    //         <Ionicons name="stats-chart" size={32} color="#FF6B35" />
+    //         <Text style={styles.quickActionText}>Analytics</Text>
+    //       </TouchableOpacity>
+    //     </View>
+
+    //     {/* Posts Feed */}
+    //     <View style={styles.feedContainer}>
+    //       <Text style={styles.sectionTitle}>Recent Community Reports</Text>
+    //       <Text style={styles.sectionSubtitle}>Stay updated with local issues and community progress</Text>
+
+    //       <FlatList
+    //         data={posts}
+    //         renderItem={renderPost}
+    //         keyExtractor={(item) => item.id}
+    //         showsVerticalScrollIndicator={false}
+    //         scrollEnabled={false}
+    //       />
+    //     </View>
+    //   </ScrollView>
+    // </SafeAreaView>
+
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollContainer}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Community Hub</Text>
-          <Text style={styles.headerSubtitle}>Connect, Report, Resolve Together</Text>
-        </View>
+      <UniversalHeader
+        title="Community Feed"
+        showBackButton={true}
+      />
 
-        {/* Statistics */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>247</Text>
-            <Text style={styles.statLabel}>Total Reports</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>89</Text>
-            <Text style={styles.statLabel}>Active Issues</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>158</Text>
-            <Text style={styles.statLabel}>Resolved</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statNumber}>1.2K</Text>
-            <Text style={styles.statLabel}>Community</Text>
-          </View>
-        </View>
+      <Text>Coming soon...</Text>
 
-        {/* Filter Tabs */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'all' && styles.activeTab]}
-            onPress={() => setActiveTab('all')}
-          >
-            <Ionicons
-              name="list"
-              size={20}
-              color={activeTab === 'all' ? '#FFFFFF' : '#666666'}
-            />
-            <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
-              All Posts
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'trending' && styles.activeTab]}
-            onPress={() => setActiveTab('trending')}
-          >
-            <Ionicons
-              name="trending-up"
-              size={20}
-              color={activeTab === 'trending' ? '#FFFFFF' : '#666666'}
-            />
-            <Text style={[styles.tabText, activeTab === 'trending' && styles.activeTabText]}>
-              Trending
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'activity' && styles.activeTab]}
-            onPress={() => setActiveTab('activity')}
-          >
-            <Ionicons
-              name="person"
-              size={20}
-              color={activeTab === 'activity' ? '#FFFFFF' : '#666666'}
-            />
-            <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
-              My Activity
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'nearby' && styles.activeTab]}
-            onPress={() => setActiveTab('nearby')}
-          >
-            <Ionicons
-              name="location"
-              size={20}
-              color={activeTab === 'nearby' ? '#FFFFFF' : '#666666'}
-            />
-            <Text style={[styles.tabText, activeTab === 'nearby' && styles.activeTabText]}>
-              Nearby
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Actions */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickAction}>
-            <Ionicons name="add-circle" size={32} color="#FF6B35" />
-            <Text style={styles.quickActionText}>Report Issue</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction}>
-            <Ionicons name="map" size={32} color="#FF6B35" />
-            <Text style={styles.quickActionText}>View Map</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction}>
-            <Ionicons name="stats-chart" size={32} color="#FF6B35" />
-            <Text style={styles.quickActionText}>Analytics</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Posts Feed */}
-        <View style={styles.feedContainer}>
-          <Text style={styles.sectionTitle}>Recent Community Reports</Text>
-          <Text style={styles.sectionSubtitle}>Stay updated with local issues and community progress</Text>
-
-          <FlatList
-            data={posts}
-            renderItem={renderPost}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            scrollEnabled={false}
-          />
-        </View>
-      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -301,6 +308,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+    marginTop: 66,
   },
   statItem: {
     alignItems: 'center',

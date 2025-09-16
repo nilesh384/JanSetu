@@ -4,11 +4,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
     Dimensions,
+    Linking,
     StyleSheet,
     Text,
     TouchableOpacity,
     View
 } from 'react-native';
+import WebViewModal from './WebViewModal';
 
 const { width } = Dimensions.get('window');
 
@@ -16,8 +18,11 @@ interface HomeHeaderProps{
   userName?: string;
 }
 
-const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक" }) => {
+const HomeHeader: React.FC<HomeHeaderProps> = () => {
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
+  const [webViewVisible, setWebViewVisible] = useState(false);
+  const [webViewUrl, setWebViewUrl] = useState('');
+  const [webViewTitle, setWebViewTitle] = useState('');
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const translateAnim = useRef(new Animated.Value(0)).current;
 
@@ -28,7 +33,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
       message: "Report critical issues like accidents, fires, or medical emergencies immediately",
       icon: "alert-circle",
       color: "#DC2626",
-      action: "emergency"
+      action: "emergency",
+      link: "https://jh.erss.in/"
     },
     {
       id: 2,
@@ -36,7 +42,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
       message: "Report potholes, broken streetlights, damaged roads, and infrastructure issues",
       icon: "construct",
       color: "#FF6B35",
-      action: "infrastructure"
+      action: "infrastructure",
+      link: "https://jharkhand.mygov.in/en/group-issue/public-grievances-management-system"
     },
     {
       id: 3,
@@ -44,7 +51,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
       message: "Report overflowing garbage bins, illegal dumping, and sanitation problems",
       icon: "trash",
       color: "#059669",
-      action: "sanitation"
+      action: "sanitation",
+      link: "https://www.jharkhand.gov.in/drinking-water"
     },
     {
       id: 4,
@@ -52,7 +60,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
       message: "Report water supply issues, pipe leaks, and utility service problems",
       icon: "water",
       color: "#2563EB",
-      action: "utilities"
+      action: "utilities",
+      link: "https://www.jharkhand.gov.in/drinking-water"
     },
     {
       id: 5,
@@ -60,7 +69,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
       message: "Report health hazards, unsafe conditions, and public safety concerns",
       icon: "medical",
       color: "#7C3AED",
-      action: "health"
+      action: "health",
+      link: "https://jh.erss.in/"
     },
     {
       id: 6,
@@ -68,7 +78,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
       message: "Monitor the status of your submitted reports and get resolution updates",
       icon: "analytics",
       color: "#EA580C",
-      action: "track"
+      action: "track",
+      link: "/complaints/my"
     }
   ];
 
@@ -113,6 +124,28 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
   }, [fadeAnim, translateAnim]);
 
   const currentTip = citizenTips[currentTipIndex];
+
+  const handleLinkPress = async (link: string) => {
+    try {
+      if (link.startsWith('/')) {
+        // Internal navigation
+        router.push(link as any);
+      } else {
+        // External URL - open in WebView modal
+        setWebViewUrl(link);
+        setWebViewTitle(currentTip.title);
+        setWebViewVisible(true);
+      }
+    } catch (error) {
+      console.error('Error opening link:', error);
+    }
+  };
+
+  const handleWebViewClose = () => {
+    setWebViewVisible(false);
+    setWebViewUrl('');
+    setWebViewTitle('');
+  };
 
   return (
     <View style={styles.container}>
@@ -174,9 +207,12 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
                   ))}
                 </View>
 
-                <TouchableOpacity style={styles.learnMoreButton}>
+                <TouchableOpacity 
+                  style={styles.learnMoreButton}
+                  onPress={() => handleLinkPress(currentTip.link)}
+                >
                   <Text style={styles.learnMoreText}>Learn More</Text>
-                  <AntDesign name="arrowright" size={14} color={currentTip.color} />
+                  <AntDesign name="arrow-right" size={14} color={currentTip.color} />
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -207,6 +243,14 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({ userName = "नागरिक"
           </View>
         </View>
       </View>
+
+      {/* WebView Modal */}
+      <WebViewModal
+        visible={webViewVisible}
+        url={webViewUrl}
+        title={webViewTitle}
+        onClose={handleWebViewClose}
+      />
     </View>
   );
 };
@@ -330,6 +374,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
   },
   learnMoreText: {
     fontSize: 12,
