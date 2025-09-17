@@ -25,11 +25,25 @@ const uploadOnCloudinary = async (localFilePath) => {
         })
         // file has been uploaded successfull
         //console.log("file is uploaded on cloudinary ", response.url);
-        fs.unlinkSync(localFilePath)
+        try {
+            if (fs.existsSync(localFilePath)) {
+                fs.unlinkSync(localFilePath)
+            }
+        } catch (cleanupErr) {
+            console.warn('⚠️ Failed to remove temp file after successful upload:', localFilePath, cleanupErr);
+        }
         return response;
 
     } catch (error) {
-        fs.unlinkSync(localFilePath) // remove the locally saved temporary file as the upload operation got failed
+        // Log the Cloudinary upload error for debugging
+        console.error('❌ Cloudinary upload failed for:', localFilePath, error);
+        try {
+            if (fs.existsSync(localFilePath)) {
+                fs.unlinkSync(localFilePath) // remove the locally saved temporary file as the upload operation got failed
+            }
+        } catch (cleanupErr) {
+            console.warn('⚠️ Failed to remove temp file after failed upload:', localFilePath, cleanupErr);
+        }
         return null;
     }
 }

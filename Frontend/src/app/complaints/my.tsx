@@ -16,6 +16,7 @@ import {
 import { useAuth } from '@/src/context/AuthContext';
 import { getUserReports } from '@/src/api/report';
 import UniversalHeader from '@/src/components/UniversalHeader';
+import { formatDateParts } from '@/src/utils/date';
 
 // Utility function to detect video files
 const isVideoFile = (url: string): boolean => {
@@ -76,13 +77,7 @@ const getPriorityColor = (priority: string) => {
   }
 };
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return {
-    date: date.toLocaleDateString(),
-    time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  };
-};
+const formatDate = (dateString: string | null) => formatDateParts(dateString);
 
 export default function MyComplaints() {
   const { user } = useAuth();

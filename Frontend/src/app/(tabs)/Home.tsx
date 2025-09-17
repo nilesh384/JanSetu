@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { getNearbyReports, getCommunityStats } from '@/src/api/report';
 import { useAuth } from '@/src/context/AuthContext';
 import { Report } from '@/src/types/report';
+import { formatTimeAgo, parseServerDate } from '@/src/utils/date';
 
 interface ExtendedReport extends Report {
   distance?: number;
@@ -36,19 +37,8 @@ export default function Home() {
   });
   const [statsLoading, setStatsLoading] = useState(false);
 
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInMs = now.getTime() - date.getTime();
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-    
-    if (diffInDays === 0) return 'Today';
-    if (diffInDays === 1) return '1 day ago';
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-    if (diffInDays < 30) return `${Math.floor(diffInDays / 7)} week${Math.floor(diffInDays / 7) > 1 ? 's' : ''} ago`;
-    if (diffInDays < 365) return `${Math.floor(diffInDays / 30)} month${Math.floor(diffInDays / 30) > 1 ? 's' : ''} ago`;
-    return `${Math.floor(diffInDays / 365)} year${Math.floor(diffInDays / 365) > 1 ? 's' : ''} ago`;
-  };
+  // Use centralized helper that correctly parses server timestamps
+  // formatTimeAgo accepts ISO or SQL-like timestamp strings
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
     const R = 6371; // Radius of the Earth in kilometers
@@ -102,7 +92,11 @@ export default function Home() {
             }
             return report;
           })
-          .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .sort((a: any, b: any) => {
+            const ta = parseServerDate(a.createdAt)?.getTime() || 0;
+            const tb = parseServerDate(b.createdAt)?.getTime() || 0;
+            return tb - ta;
+          })
           .slice(0, 2); // Get only the latest 2 reports
 
         setNearbyReports(reportsWithDistance);

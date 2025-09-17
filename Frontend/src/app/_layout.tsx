@@ -1,5 +1,6 @@
 import { Stack } from "expo-router";
 import { AuthProvider } from "../context/AuthContext";
+import FloatingChatbot from "../components/FloatingChatbot";
 
 export default function RootLayout() {
   return (
@@ -13,6 +14,7 @@ export default function RootLayout() {
         <Stack.Screen name="profileSettings" options={{ headerShown: false }} />
         <Stack.Screen name="reportDetails" options={{ headerShown: false }} />
       </Stack>
+      <FloatingChatbot />
     </AuthProvider>
   );
 }
