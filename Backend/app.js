@@ -20,6 +20,7 @@ import otpRouter from "./routes/otp.routes.js";
 import reportsRouter from "./routes/reports.routes.js";
 import healthRouter from "./routes/health.routes.js";
 import adminRouter from "./routes/admin.routes.js";
+import messagesRouter from "./routes/messages.routes.js";
 
 
 //routes declaration
@@ -28,6 +29,7 @@ app.use("/api/v1/otp", otpRouter);
 app.use("/api/v1/reports", reportsRouter);
 app.use("/api/v1/health", healthRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/messages", messagesRouter);
 
 
 

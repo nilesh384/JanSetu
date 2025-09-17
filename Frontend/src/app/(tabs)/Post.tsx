@@ -30,29 +30,111 @@ interface LocationData {
 }
 
 const issueCategories = [
-  { id: 'roads', name: 'Roads & Traffic', icon: 'traffic', department: 'Public Works' },
-  { id: 'water', name: 'Water Supply', icon: 'water-drop', department: 'Water Board' },
-  { id: 'sanitation', name: 'Sanitation', icon: 'delete', department: 'Sanitation Dept' },
-  { id: 'electricity', name: 'Electricity', icon: 'lightbulb', department: 'Electricity Board' },
-  { id: 'infrastructure', name: 'Infrastructure', icon: 'construction', department: 'Municipal Corp' },
-  { id: 'environment', name: 'Environment', icon: 'park', department: 'Environment Dept' },
-  { id: 'safety', name: 'Public Safety', icon: 'security', department: 'Police Dept' },
-  { id: 'other', name: 'Other Issues', icon: 'more-horiz', department: 'General' },
-];
-
-const priorityLevels = [
-  { id: 'low', name: 'Low Priority', color: '#4CAF50', description: 'Minor issue, can wait' },
-  { id: 'medium', name: 'Medium Priority', color: '#FF9800', description: 'Moderate concern' },
-  { id: 'high', name: 'High Priority', color: '#F44336', description: 'Urgent attention needed' },
-  { id: 'critical', name: 'Critical', color: '#9C27B0', description: 'Emergency situation' },
+  { 
+    id: 1, 
+    name: "Roads & Infrastructure", 
+    description: "Report potholes, damaged pavements, unsafe road conditions, or encroachments.",
+    department: "Municipal Engineering Division",
+    icon: 'map'
+  },
+  { 
+    id: 2, 
+    name: "Street Lighting & Electrical", 
+    description: "Non-functional streetlights, exposed wires, or electrical pole issues.",
+    department: "Municipal Electrical Wing",
+    icon: 'lightbulb'
+  },
+  { 
+    id: 3, 
+    name: "Sanitation & Waste", 
+    description: "Overflowing garbage bins, irregular pickup, open drains, or illegal dumping.",
+    department: "Municipal Sanitation Department",
+    icon: 'delete'
+  },
+  { 
+    id: 4, 
+    name: "Water Supply & Sewerage", 
+    description: "Water leakage, blocked sewers, no water supply, or contaminated water.",
+    department: "Municipal Water Supply & Sewerage",
+    icon: 'water'
+  },
+  { 
+    id: 5, 
+    name: "Public Health & Hygiene", 
+    description: "Mosquito breeding, stagnant water, animal carcasses, or unhygienic surroundings.",
+    department: "Municipal Health Department",
+    icon: 'healing'
+  },
+  { 
+    id: 6, 
+    name: "Parks & Greenery", 
+    description: "Unmaintained parks, broken benches, damaged trees, or need for plantation.",
+    department: "Municipal Horticulture Division",
+    icon: 'park'
+  },
+  { 
+    id: 7, 
+    name: "Traffic & Transport", 
+    description: "Broken signals, missing signage, illegal parking, or road encroachments.",
+    department: "Municipal Traffic Engineering Division",
+    icon: 'traffic'
+  },
+  { 
+    id: 8, 
+    name: "Public Safety & Emergency", 
+    description: "Fire hazards, building collapse, unsafe structures, or accidents.",
+    department: "Fire & Emergency Services",
+    icon: 'warning'
+  },
+  { 
+    id: 9, 
+    name: "Education & Amenities", 
+    description: "Damaged school toilets, poor upkeep of libraries, or community halls.",
+    department: "Municipal Public Amenities Department",
+    icon: 'school'
+  },
+  { 
+    id: 10, 
+    name: "Encroachments & Illegal Constructions", 
+    description: "Unauthorized shops, hawkers blocking pathways, or illegal structures.",
+    department: "Municipal Urban Planning & Encroachment Removal",
+    icon: 'domain'
+  },
+  { 
+    id: 11, 
+    name: "Environment & Pollution", 
+    description: "Air/noise pollution, waste burning, or polluted lakes and ponds.",
+    department: "Municipal Environment Cell",
+    icon: 'public'
+  },
+  { 
+    id: 12, 
+    name: "Animal Control", 
+    description: "Stray dogs, cattle menace, or injured/abandoned animals.",
+    department: "Municipal Veterinary Department",
+    icon: 'pets'
+  },
+  { 
+    id: 13, 
+    name: "Citizen Services", 
+    description: "Delays in birth/death certificates, property tax disputes, billing issues.",
+    department: "Municipal Citizen Service Centre",
+    icon: 'assignment'
+  },
+  { 
+    id: 14, 
+    name: "Others", 
+    description: "Any issues excluding the given categories",
+    department: "General Administrative Office",
+    icon: 'ellipsis-horizontal'
+  }
 ];
 
 export default function Post() {
   const { user } = useAuth();
   const router = useRouter();
   
-  const [selectedCategory, setSelectedCategory] = useState('');
-  const [selectedPriority, setSelectedPriority] = useState('medium');
+  const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [mediaItems, setMediaItems] = useState<Array<{id: string, uri: string, type: 'image' | 'video'}>>([]);
@@ -411,7 +493,7 @@ export default function Post() {
       Alert.alert('Missing Information', 'Please provide a description of the issue');
       return false;
     }
-    if (!selectedCategory) {
+    if (selectedCategory === null) {
       Alert.alert('Missing Information', 'Please select an issue category');
       return false;
     }
@@ -492,12 +574,12 @@ export default function Post() {
         userId: user?.id || '',
         title: title.trim(),
         description: description.trim(),
-        category: selectedCategory,
-        priority: selectedPriority,
+        category: selectedCategoryData?.name || 'Others',
+        priority: 'auto',
         latitude: location?.latitude || 0,
         longitude: location?.longitude || 0,
         address: location?.address || '',
-        department: selectedCategoryData?.department || 'General',
+        department: selectedCategoryData?.department || 'General Administrative Office',
         mediaUrls: uploadedMediaUrls,
         audioUrl: uploadedAudioUrl
       };
@@ -538,8 +620,7 @@ export default function Post() {
               // Reset form
               setTitle('');
               setDescription('');
-              setSelectedCategory('');
-              setSelectedPriority('medium');
+              setSelectedCategory(null);
               setMediaItems([]);
               removeRecording();
               setUploadProgress('');
@@ -596,7 +677,7 @@ export default function Post() {
     onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
   >
     <Text style={styles.dropdownText}>
-      {selectedCategory ? issueCategories.find(c => c.id === selectedCategory)?.name : 'Select Category'}
+      {selectedCategory !== null ? issueCategories.find(c => c.id === selectedCategory)?.name : 'Select Category'}
     </Text>
     <Ionicons name="chevron-down" size={20} color="#666" />
   </TouchableOpacity>
@@ -613,7 +694,10 @@ export default function Post() {
           }}
         >
           <MaterialIcons name={category.icon as any} size={20} color="#FF6B35" />
-          <Text style={styles.dropdownItemText}>{category.name}</Text>
+          <View style={styles.categoryTextContainer}>
+            <Text style={styles.dropdownItemText}>{category.name}</Text>
+            <Text style={styles.categoryDescription}>{category.description}</Text>
+          </View>
         </TouchableOpacity>
       ))}
     </View>
@@ -621,34 +705,8 @@ export default function Post() {
 </View>
 
 
-        {/* Priority Selection */}
-        {/* <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Priority Level</Text>
-          <View style={styles.priorityContainer}>
-            {priorityLevels.map(priority => (
-              <TouchableOpacity
-                key={priority.id}
-                style={[
-                  styles.priorityCard,
-                  selectedPriority === priority.id && styles.selectedPriorityCard,
-                  { borderColor: priority.color },
-                ]}
-                onPress={() => setSelectedPriority(priority.id)}
-              >
-                <View style={[styles.priorityIndicator, { backgroundColor: priority.color }]} />
-                <View style={styles.priorityContent}>
-                  <Text style={[
-                    styles.priorityName,
-                    selectedPriority === priority.id && styles.selectedPriorityName,
-                  ]}>
-                    {priority.name}
-                  </Text>
-                  <Text style={styles.priorityDescription}>{priority.description}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View> */}
+        {/* Priority Selection - Automatically determined by system */}
+        {/* Priority is now automatically calculated based on location and category severity */}
 
         {/* Issue Title */}
         <View style={styles.section}>
@@ -909,42 +967,6 @@ section: {
   selectedCategoryName: {
     color: '#FFFFFF',
   },
-  priorityContainer: {
-    gap: 12,
-  },
-  priorityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    borderWidth: 2,
-  },
-  selectedPriorityCard: {
-    backgroundColor: '#FFFFFF',
-  },
-  priorityIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
-  },
-  priorityContent: {
-    flex: 1,
-  },
-  priorityName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  selectedPriorityName: {
-    color: '#333333',
-  },
-  priorityDescription: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 2,
-  },
   titleInput: {
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -968,33 +990,66 @@ section: {
   justifyContent: 'space-between',
   alignItems: 'center',
   backgroundColor: '#FFFFFF',
-  borderWidth: 1,
-  borderColor: '#E0E0E0',
-  borderRadius: 8,
-  padding: 16,
+  borderWidth: 2,
+  borderColor: '#D0D0D0',
+  borderRadius: 12,
+  padding: 18,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.1,
+  shadowRadius: 3.84,
+  elevation: 5,
 },
 dropdownText: {
   fontSize: 16,
   color: '#333',
+  fontWeight: '600',
 },
 dropdownList: {
   backgroundColor: '#FFFFFF',
-  borderWidth: 1,
-  borderColor: '#E0E0E0',
-  borderRadius: 8,
-  marginTop: 4,
+  borderWidth: 2,
+  borderColor: '#D0D0D0',
+  borderRadius: 12,
+  marginTop: 8,
+  shadowColor: '#000',
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.1,
+  shadowRadius: 3.84,
+  elevation: 5,
 },
 dropdownItem: {
   flexDirection: 'row',
-  alignItems: 'center',
-  padding: 16,
+  alignItems: 'flex-start',
+  padding: 18,
   borderBottomWidth: 1,
-  borderBottomColor: '#F0F0F0',
+  borderBottomColor: '#E8E8E8',
+  backgroundColor: '#FAFAFA',
+  marginHorizontal: 4,
+  marginVertical: 2,
+  borderRadius: 8,
 },
 dropdownItemText: {
   fontSize: 16,
   marginLeft: 12,
-  color: '#333',
+  color: '#222',
+  fontWeight: '700',
+},
+categoryTextContainer: {
+  flex: 1,
+  marginLeft: 12,
+},
+categoryDescription: {
+  fontSize: 12,
+  color: '#555',
+  marginTop: 3,
+  lineHeight: 16,
+  fontWeight: '500',
 },
 
   charCount: {

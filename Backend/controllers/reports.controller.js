@@ -1,6 +1,82 @@
 import dbConnect from "../db/dbConnect.js";
 import { uploadOnCloudinary } from "../services/cloudinary.js";
 
+// Helper to convert DB timestamp values to ISO strings (null-safe)
+const toISO = (val) => (val ? new Date(val).toISOString() : null);
+
+/**
+ * Compute automatic priority based on:
+ *  - number of unresolved reports in the area (radiusMeters)
+ *  - recency window (days)
+ *  - category severity weight
+ *
+ * Returns: 'low' | 'medium' | 'high' | 'critical'
+ */
+const computeAutoPriority = async (client, latitude, longitude, category = '', days = 30, radiusMeters = 500) => {
+  try {
+    console.log(`🔍 Computing auto-priority for category "${category}" at (${latitude}, ${longitude})`);
+    
+    // Use haversine distance formula to find nearby unresolved reports
+    const nearbyQuery = `
+      SELECT COUNT(*) AS cnt
+      FROM reports
+      WHERE is_resolved = false
+        AND created_at >= NOW() - ($3 || ' days')::interval
+        AND (
+          6371000 * acos(
+            LEAST(1, cos(radians($1)) * cos(radians(latitude)) * cos(radians(longitude) - radians($2))
+            + sin(radians($1)) * sin(radians(latitude)))
+          )
+        ) <= $4
+    `;
+    
+    const result = await client.query(nearbyQuery, [latitude, longitude, days, radiusMeters]);
+    const nearbyCount = parseInt(result.rows[0]?.cnt || 0, 10);
+    
+    // Category severity weights - critical categories get higher priority
+    const highSeverityCategories = [
+      'Public Safety & Emergency',
+      'Water Supply & Sewerage', 
+      'Traffic & Transport',
+      'Municipal Urban Planning & Encroachment Removal'
+    ];
+    
+    const mediumSeverityCategories = [
+      'Street Lighting & Electrical',
+      'Roads & Infrastructure',
+      'Public Health & Hygiene'
+    ];
+    
+    let severityWeight = 1;
+    if (highSeverityCategories.includes(category)) {
+      severityWeight = 3;
+    } else if (mediumSeverityCategories.includes(category)) {
+      severityWeight = 2;
+    }
+    
+    // Calculate final score
+    const score = nearbyCount * severityWeight;
+    
+    let computedPriority;
+    if (score >= 15) {
+      computedPriority = 'critical';
+    } else if (score >= 8) {
+      computedPriority = 'high';
+    } else if (score >= 3) {
+      computedPriority = 'medium';
+    } else {
+      computedPriority = 'low';
+    }
+    
+    console.log(`📊 Auto-priority: nearby=${nearbyCount}, severity=${severityWeight}, score=${score} → ${computedPriority}`);
+    return computedPriority;
+    
+  } catch (error) {
+    console.warn('⚠️ Priority auto-compute failed, falling back to medium:', error);
+    return 'medium';
+  }
+};
+
 // Create a new report
 const createReport = async (req, res) => {
     try {
@@ -49,6 +125,25 @@ const createReport = async (req, res) => {
                 });
             }
 
+            // Compute priority - use auto-priority if priority is 'auto' or missing
+            let finalPriority = priority || 'auto';
+            if (finalPriority === 'auto') {
+                try {
+                    finalPriority = await computeAutoPriority(
+                        client,
+                        latitude || 0,
+                        longitude || 0,
+                        category || '',
+                        30,      // window in days
+                        500      // radius in meters to consider "nearby area"
+                    );
+                    console.log('✅ Auto-priority computed as:', finalPriority);
+                } catch (err) {
+                    console.warn('⚠️ Priority auto-compute failed, falling back to medium:', err);
+                    finalPriority = 'medium';
+                }
+            }
+
             // Create the report
             const insertQuery = `
                 INSERT INTO reports (
@@ -72,7 +167,7 @@ const createReport = async (req, res) => {
                 title,
                 description || '',
                 category || 'other',
-                priority || 'medium',
+                finalPriority,
                 actualMediaUrls,
                 actualAudioUrl || null,
                 latitude || null,
@@ -109,8 +204,8 @@ const createReport = async (req, res) => {
                 address: newReport.address,
                 department: newReport.department,
                 isResolved: newReport.is_resolved,
-                createdAt: newReport.created_at,
-                resolvedAt: newReport.resolved_at,
+                createdAt: toISO(newReport.created_at),
+                resolvedAt: toISO(newReport.resolved_at),
                 resolvedMediaUrls: newReport.resolved_media_urls,
                 resolutionNotes: newReport.resolution_note,
                 resolvedByAdminId: newReport.resolved_by_admin_id,
@@ -206,8 +301,8 @@ const getUserReports = async (req, res) => {
                 address: report.address,
                 department: report.department,
                 isResolved: report.is_resolved,
-                createdAt: report.created_at,
-                resolvedAt: report.resolved_at,
+                createdAt: toISO(report.created_at),
+                resolvedAt: toISO(report.resolved_at),
                 resolvedMediaUrls: report.resolved_media_urls,
                 resolutionNotes: report.resolution_note,
                 resolvedByAdminId: report.resolved_by_admin_id,
@@ -310,8 +405,8 @@ const getReportById = async (req, res) => {
                 address: report.address,
                 department: report.department,
                 isResolved: report.is_resolved,
-                createdAt: report.created_at,
-                resolvedAt: report.resolved_at,
+                createdAt: toISO(report.created_at),
+                resolvedAt: toISO(report.resolved_at),
                 resolvedMediaUrls: report.resolved_media_urls,
                 resolutionNotes: report.resolution_note,
                 resolvedByAdminId: report.resolved_by_admin_id,
@@ -496,8 +591,8 @@ const updateReport = async (req, res) => {
                 address: updatedReport.address,
                 department: updatedReport.department,
                 isResolved: updatedReport.is_resolved,
-                createdAt: updatedReport.created_at,
-                resolvedAt: updatedReport.resolved_at,
+                createdAt: toISO(updatedReport.created_at),
+                resolvedAt: toISO(updatedReport.resolved_at),
                 resolvedMediaUrls: updatedReport.resolved_media_urls,
                 resolutionNotes: updatedReport.resolution_note,
                 resolvedByAdminId: updatedReport.resolved_by_admin_id,
@@ -707,8 +802,8 @@ const resolveReport = async (req, res) => {
                 address: resolvedReport.address,
                 department: resolvedReport.department,
                 isResolved: resolvedReport.is_resolved,
-                createdAt: resolvedReport.created_at,
-                resolvedAt: resolvedReport.resolved_at,
+                createdAt: toISO(resolvedReport.created_at),
+                resolvedAt: toISO(resolvedReport.resolved_at),
                 resolvedMediaUrls: resolvedReport.resolved_media_urls,
                 resolutionNotes: resolvedReport.resolution_note,
                 resolvedByAdminId: resolvedReport.resolved_by_admin_id,
@@ -852,11 +947,14 @@ const getNearbyReports = async (req, res) => {
             // Using the haversine formula to calculate distance
             const nearbyQuery = `
                 SELECT r.*, u.full_name as user_name,
+                    admins.full_name as resolved_by,
+                    admins.role as resolved_by_role,
                     (6371 * acos(cos(radians($1)) * cos(radians(r.latitude)) * 
                     cos(radians(r.longitude) - radians($2)) + 
                     sin(radians($1)) * sin(radians(r.latitude)))) AS distance
                 FROM reports r
                 JOIN users u ON r.user_id = u.id
+                LEFT JOIN admins ON r.resolved_by_admin_id = admins.id
                 WHERE r.latitude IS NOT NULL 
                     AND r.longitude IS NOT NULL
                     AND (6371 * acos(cos(radians($1)) * cos(radians(r.latitude)) * 
@@ -890,8 +988,14 @@ const getNearbyReports = async (req, res) => {
                 address: report.address,
                 department: report.department,
                 isResolved: report.is_resolved,
-                createdAt: report.created_at,
-                resolvedAt: report.resolved_at,
+                createdAt: toISO(report.created_at),
+                resolvedAt: toISO(report.resolved_at),
+                resolvedMediaUrls: report.resolved_media_urls,
+                resolutionNotes: report.resolution_note,
+                resolvedByAdminId: report.resolved_by_admin_id,
+                resolvedBy: report.resolved_by,
+                resolvedByRole: report.resolved_by_role,
+                timeTakenToResolve: report.time_taken_to_resolve,
                 distance: parseFloat(report.distance).toFixed(2)
             }));
 
@@ -1385,8 +1489,8 @@ const getAdminReports = async (req, res) => {
                 resolvedMediaUrls: report.resolved_media_urls,
                 timeTakenToResolve: report.time_taken_to_resolve,
                 status: report.status,
-                createdAt: report.created_at,
-                updatedAt: report.updated_at
+                createdAt: toISO(report.created_at),
+                updatedAt: toISO(report.updated_at)
             }));
 
             console.log(`✅ Found ${mappedReports.length} reports for admin ${adminId} (role: ${adminRole})`);

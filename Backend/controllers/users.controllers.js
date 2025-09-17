@@ -2,6 +2,9 @@ import dbConnect from "../db/dbConnect.js";
 import crypto from "crypto";
 import { uploadOnCloudinary, deleteOnCloudinary, extractPublicIdFromUrl } from "../services/cloudinary.js";
 
+// Helper to convert DB timestamp values to ISO strings (null-safe)
+const toISO = (val) => (val ? new Date(val).toISOString() : null);
+
 // Create or login user after OTP verification
 const createOrLoginUser = async (req, res) => {
     try {
@@ -48,9 +51,9 @@ const createOrLoginUser = async (req, res) => {
                     isVerified: rawUser.is_verified,
                     totalReports: rawUser.total_reports,
                     resolvedReports: rawUser.resolved_reports,
-                    createdAt: rawUser.created_at,
-                    updatedAt: rawUser.updated_at,
-                    lastLogin: rawUser.last_login
+                    createdAt: toISO(rawUser.created_at),
+                    updatedAt: toISO(rawUser.updated_at),
+                    lastLogin: toISO(rawUser.last_login)
                 };
                 
                 return res.status(200).json({
@@ -99,9 +102,9 @@ const createOrLoginUser = async (req, res) => {
                     isVerified: newUser.is_verified,
                     totalReports: newUser.total_reports,
                     resolvedReports: newUser.resolved_reports,
-                    createdAt: newUser.created_at,
-                    updatedAt: newUser.updated_at,
-                    lastLogin: newUser.last_login
+                    createdAt: toISO(newUser.created_at),
+                    updatedAt: toISO(newUser.updated_at),
+                    lastLogin: toISO(newUser.last_login)
                 };
                 
                 return res.status(201).json({
@@ -183,9 +186,9 @@ const updateUserProfile = async (req, res) => {
                 isVerified: updatedUser.is_verified,
                 totalReports: updatedUser.total_reports,
                 resolvedReports: updatedUser.resolved_reports,
-                createdAt: updatedUser.created_at,
-                updatedAt: updatedUser.updated_at,
-                lastLogin: updatedUser.last_login
+                createdAt: toISO(updatedUser.created_at),
+                updatedAt: toISO(updatedUser.updated_at),
+                lastLogin: toISO(updatedUser.last_login)
             };
             
             res.status(200).json({
@@ -248,9 +251,9 @@ const getUserById = async (req, res) => {
                 isVerified: user.is_verified,
                 totalReports: user.total_reports,
                 resolvedReports: user.resolved_reports,
-                createdAt: user.created_at,
-                updatedAt: user.updated_at,
-                lastLogin: user.last_login
+                createdAt: toISO(user.created_at),
+                updatedAt: toISO(user.updated_at),
+                lastLogin: toISO(user.last_login)
             };
             
             res.status(200).json({
@@ -313,9 +316,9 @@ const getUserByPhone = async (req, res) => {
                 isVerified: user.is_verified,
                 totalReports: user.total_reports,
                 resolvedReports: user.resolved_reports,
-                createdAt: user.created_at,
-                updatedAt: user.updated_at,
-                lastLogin: user.last_login
+                createdAt: toISO(user.created_at),
+                updatedAt: toISO(user.updated_at),
+                lastLogin: toISO(user.last_login)
             };
             
             res.status(200).json({
@@ -427,9 +430,9 @@ const uploadProfileImage = async (req, res) => {
                 isVerified: updatedUser.is_verified,
                 totalReports: updatedUser.total_reports,
                 resolvedReports: updatedUser.resolved_reports,
-                createdAt: updatedUser.created_at,
-                updatedAt: updatedUser.updated_at,
-                lastLogin: updatedUser.last_login
+                createdAt: toISO(updatedUser.created_at),
+                updatedAt: toISO(updatedUser.updated_at),
+                lastLogin: toISO(updatedUser.last_login)
             };
             
             res.status(200).json({

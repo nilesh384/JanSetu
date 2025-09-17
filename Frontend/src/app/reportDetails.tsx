@@ -18,6 +18,7 @@ import { Audio, Video, ResizeMode } from 'expo-av';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import UniversalHeader from '@/src/components/UniversalHeader';
+import { formatDateParts } from '@/src/utils/date';
 
 const { width, height } = Dimensions.get('window');
 
@@ -263,13 +264,8 @@ export default function ReportDetails() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return {
-      date: date.toLocaleDateString(),
-      time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-  };
+  // Use centralized date formatting that correctly handles ISO and SQL-like timestamps
+  const formatDate = (dateString: string | null) => formatDateParts(dateString);
 
   useEffect(() => {
     return () => {

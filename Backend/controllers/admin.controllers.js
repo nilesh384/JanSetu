@@ -1,5 +1,8 @@
 import dbConnect from "../db/dbConnect.js";
 
+// Helper to convert DB timestamp values to ISO strings (null-safe)
+const toISO = (val) => (val ? new Date(val).toISOString() : null);
+
 // Admin login - check if email exists in admins table
 const adminLogin = async (req, res) => {
     try {
@@ -55,8 +58,8 @@ const adminLogin = async (req, res) => {
                 fullName: admin.full_name,
                 department: admin.department,
                 role: admin.role,
-                lastLogin: admin.last_login,
-                createdAt: admin.created_at
+                lastLogin: toISO(admin.last_login),
+                createdAt: toISO(admin.created_at)
             };
 
             return res.status(200).json({
@@ -290,8 +293,8 @@ const getAllAdmins = async (req, res) => {
                 fullName: admin.full_name,
                 department: admin.department,
                 role: admin.role,
-                lastLogin: admin.last_login,
-                createdAt: admin.created_at
+                lastLogin: toISO(admin.last_login),
+                createdAt: toISO(admin.created_at)
             }));
 
             console.log(`✅ Retrieved ${admins.length} admins for ${requesterRole} with filter: ${filterRoles.join(', ')}`);

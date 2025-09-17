@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import * as Location from 'expo-location';
 import { useAuth } from '@/src/context/AuthContext';
+import { formatDateParts, parseServerDate } from '@/src/utils/date';
 import { getNearbyReports } from '@/src/api/report';
 import UniversalHeader from '@/src/components/UniversalHeader';
 
@@ -84,13 +85,7 @@ const getPriorityColor = (priority: string) => {
   }
 };
 
-const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
-  return {
-    date: date.toLocaleDateString(),
-    time: date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  };
-};
+const formatDate = (dateString: string | null) => formatDateParts(dateString);
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the Earth in kilometers
@@ -212,8 +207,11 @@ export default function NearbyComplaints() {
       switch (sortBy) {
         case 'distance':
           return (a.distance || 0) - (b.distance || 0);
-        case 'date':
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case 'date': {
+          const ta = parseServerDate(a.createdAt)?.getTime() || 0;
+          const tb = parseServerDate(b.createdAt)?.getTime() || 0;
+          return tb - ta;
+        }
         case 'priority':
           const priorityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
           return (priorityOrder[b.priority.toLowerCase() as keyof typeof priorityOrder] || 0) - 
