@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
     Animated,
     Dimensions,
+    Image,
     Linking,
     StyleSheet,
     Text,
@@ -158,12 +159,10 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
           {/* Greeting Section */}
           <View style={styles.greetingSection}>
             <View style={styles.greetingContainer}>
-              <View style={styles.greetingIcon}>
-                <AntDesign name="user" size={24} color="#FF6B35" />
-              </View>
+                              <Image source={require('../assets/images/bgImg.png')} style={styles.icon} />
               <View style={styles.greetingText}>
                 <Text style={styles.greetingLabel}>Welcome to</Text>
-                <Text style={styles.userName}>Jharkhand Civic Hub</Text>
+                <Text style={styles.userName}>JanSetu</Text>
               </View>
             </View>
           </View>
@@ -322,6 +321,7 @@ const styles = StyleSheet.create({
   },
   tipsContainer: {
     marginBottom: 20,
+    marginTop: -14,
   },
   tipCard: {
     backgroundColor: '#FFFFFF',
@@ -407,6 +407,12 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontWeight: '500',
   },
+  icon:{
+    width: 80,
+    height: 80,
+    resizeMode: 'contain',
+    marginRight: 0,
+  }
 });
 
 export default HomeHeader;
