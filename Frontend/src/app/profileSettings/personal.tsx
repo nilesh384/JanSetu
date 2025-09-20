@@ -16,9 +16,11 @@ import {
 import { useAuth } from '@/src/context/AuthContext';
 import { updateUserProfile } from '@/src/api/user';
 import UniversalHeader from '@/src/components/UniversalHeader';
+import { useTranslation } from 'react-i18next';
 
 export default function PersonalInfo() {
     const { user, logout, refreshUser } = useAuth();
+    const { t } = useTranslation();
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
         fullName: '',
@@ -41,25 +43,25 @@ export default function PersonalInfo() {
 
     const handleSave = async () => {
         if (!user?.id) {
-            Alert.alert('Error', 'User not found. Please log in again.');
+            Alert.alert(t('profile.error'), t('profile.userNotFound'));
             return;
         }
 
         // Validate required fields
         if (!formData.fullName.trim()) {
-            Alert.alert('Validation Error', 'Please enter your full name.');
+            Alert.alert(t('profile.validationError'), t('profile.enterFullNameError'));
             return;
         }
 
         if (!formData.email.trim()) {
-            Alert.alert('Validation Error', 'Please enter your email address.');
+            Alert.alert(t('profile.validationError'), t('profile.enterEmailError'));
             return;
         }
 
         // Basic email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(formData.email)) {
-            Alert.alert('Validation Error', 'Please enter a valid email address.');
+            Alert.alert(t('profile.validationError'), t('profile.invalidEmailError'));
             return;
         }
 
@@ -76,14 +78,14 @@ export default function PersonalInfo() {
             if (result.success) {
                 // Refresh user data in context
                 await refreshUser();
-                Alert.alert('Success', 'Personal information updated successfully!');
+                Alert.alert(t('profile.success'), t('profile.profileUpdated'));
                 router.back();
             } else {
-                Alert.alert('Error', result.message || 'Failed to update profile. Please try again.');
+                Alert.alert(t('profile.error'), result.message || t('profile.updateProfileError'));
             }
         } catch (error) {
             console.error('❌ Profile update error:', error);
-            Alert.alert('Error', 'Failed to update profile. Please check your connection and try again.');
+            Alert.alert(t('profile.error'), t('profile.connectionError'));
         } finally {
             setIsLoading(false);
         }
@@ -98,34 +100,34 @@ export default function PersonalInfo() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <UniversalHeader title="Personal Information" showBackButton={true} />
+      <UniversalHeader title={t('profile.personalInformation')} showBackButton={true} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>
-          Update your personal details and contact information
+          {t('profile.updatePersonalDetails')}
         </Text>
 
         <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Basic Information</Text>
+          <Text style={styles.sectionTitle}>{t('profile.basicInformation')}</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Name</Text>
+            <Text style={styles.inputLabel}>{t('profile.fullName')}</Text>
             <TextInput
               style={styles.input}
               value={formData.fullName}
               onChangeText={(value) => handleInputChange('fullName', value)}
-              placeholder="Enter your full name"
+              placeholder={t('profile.enterFullName')}
               editable={!isLoading}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Email Address</Text>
+            <Text style={styles.inputLabel}>{t('profile.emailAddress')}</Text>
             <TextInput
               style={styles.input}
               value={formData.email}
               onChangeText={(value) => handleInputChange('email', value)}
-              placeholder="Enter your email"
+              placeholder={t('profile.enterEmail')}
               keyboardType="email-address"
               autoCapitalize="none"
               editable={!isLoading}
@@ -133,16 +135,16 @@ export default function PersonalInfo() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Phone Number</Text>
+            <Text style={styles.inputLabel}>{t('profile.phoneNumber')}</Text>
             <TextInput
               style={[styles.input, styles.disabledInput]}
               value={formData.phoneNumber}
-              placeholder="Phone number (cannot be changed)"
+              placeholder={t('profile.phonePlaceholder')}
               keyboardType="phone-pad"
               editable={false}
             />
             <Text style={styles.inputNote}>
-              Phone number cannot be changed for security reasons
+              {t('profile.phoneSecurityNote')}
             </Text>
           </View>
         </View>
@@ -157,10 +159,10 @@ export default function PersonalInfo() {
             {isLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#FFFFFF" />
-                <Text style={styles.saveButtonText}>Saving...</Text>
+                <Text style={styles.saveButtonText}>{t('profile.saving')}</Text>
               </View>
             ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>{t('profile.saveChanges')}</Text>
             )}
           </TouchableOpacity>
 
@@ -170,7 +172,7 @@ export default function PersonalInfo() {
             activeOpacity={0.8}
             disabled={isLoading}
           >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
+            <Text style={styles.cancelButtonText}>{t('profile.cancel')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getConnectionStatus } from "../db/dbConnect.js";
+import { getConnectionStatus, getPool } from "../db/utils.js";
 
 const router = Router();
 
@@ -52,12 +52,9 @@ router.get("/", async (req, res) => {
  */
 router.get("/db", async (req, res) => {
   try {
-    const dbConnect = (await import("../db/dbConnect.js")).default;
-    
-    // Test database connection
-    const client = await dbConnect();
-    const result = await client.query('SELECT NOW() as current_time, version() as pg_version');
-    client.end(); // Release back to pool
+    // Test database connection using the centralized pool
+    const pool = getPool();
+    const result = await pool.query('SELECT NOW() as current_time, version() as pg_version');
     
     res.status(200).json({
       status: "healthy",

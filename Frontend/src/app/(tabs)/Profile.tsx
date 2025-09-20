@@ -5,8 +5,6 @@ import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   Alert,
-  Image,
-  Modal,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -14,9 +12,12 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Image,
+  Modal,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { uploadProfileImage } from '../../api/user.js';
+import { useTranslation } from 'react-i18next';
 
 interface ProfileOption {
   id: string;
@@ -28,7 +29,8 @@ interface ProfileOption {
 }
 
 export default function Profile() {
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, refreshUser, isLoading, isAuthenticated } = useAuth();
+  const { t } = useTranslation();
   const [cameraModalVisible, setCameraModalVisible] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [cameraType, setCameraType] = useState<'front' | 'back'>('front');
@@ -41,6 +43,8 @@ export default function Profile() {
   console.log('🔍 User object:', user);
   console.log('🖼️ Profile image URL:', user?.profileImageUrl);
   console.log('🖼️ User ID:', user?.id);
+  console.log('🔄 Is loading:', isLoading);
+  console.log('🔐 Is authenticated:', isAuthenticated);
 
   const requestCameraPermission = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
@@ -54,13 +58,13 @@ export default function Profile() {
       setZoom(0); // Reset zoom when opening camera
       setCameraModalVisible(true);
     } else {
-      Alert.alert('Permission needed', 'Camera permissions are required to take photos.');
+      Alert.alert(t('profile.error'), t('profile.cameraPermissionNeeded'));
     }
   };
 
   const updateProfileImage = async (imageUri: string) => {
     if (!user?.id) {
-      Alert.alert('Error', 'User not found. Please try logging in again.');
+      Alert.alert(t('profile.error'), t('profile.userNotFound'));
       return;
     }
 
@@ -73,13 +77,13 @@ export default function Profile() {
       if (result.success) {
         // Refresh user data to get the new profile image URL
         await refreshUser();
-        Alert.alert('Success', 'Profile image updated successfully!');
+        Alert.alert(t('profile.success'), t('profile.profileImageUpdated'));
       } else {
-        Alert.alert('Error', result.message || 'Failed to upload image. Please try again.');
+        Alert.alert(t('profile.error'), result.message || t('profile.uploadImageError'));
       }
     } catch (error) {
       console.error('Image upload error:', error);
-      Alert.alert('Error', 'Failed to upload image. Please try again.');
+      Alert.alert(t('profile.error'), t('profile.uploadImageError'));
     } finally {
       setIsUpdatingImage(false);
     }
@@ -95,7 +99,7 @@ export default function Profile() {
         setCameraModalVisible(false);
         await updateProfileImage(photo.uri);
       } catch (error) {
-        Alert.alert('Error', 'Failed to take photo. Please try again.');
+        Alert.alert(t('profile.error'), t('profile.takePhotoError'));
       }
     }
   };
@@ -133,7 +137,7 @@ export default function Profile() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Camera roll permissions are required to select a photo.');
+      Alert.alert(t('profile.permissionNeeded'));
       return;
     }
 
@@ -167,7 +171,7 @@ export default function Profile() {
                 updateProfileImage(result.assets[0].uri);
               }
             }).catch(error => {
-              Alert.alert('Error', 'Failed to open camera');
+              Alert.alert(t('profile.error'), t('profile.openCameraError'));
             });
           }
         },
@@ -233,19 +237,19 @@ export default function Profile() {
 
   const handleLogout = () => {
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      t('profile.logout'),
+      t('profile.logoutConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.cancel'), style: 'cancel' },
         { 
-          text: 'Logout', 
+          text: t('profile.confirmLogout'), 
           style: 'destructive', 
           onPress: async () => {
             try {
               await logout();
               router.replace('/auth/phone' as any);
             } catch (error) {
-              Alert.alert('Error', 'Failed to logout. Please try again.');
+              Alert.alert(t('profile.logoutError'));
             }
           }
         },
@@ -255,15 +259,15 @@ export default function Profile() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.',
+      t('profile.deleteAccount'),
+      t('profile.deleteAccountConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.cancel'), style: 'cancel' },
         {
-          text: 'Delete Account',
+          text: t('profile.deleteAccount'),
           style: 'destructive',
           onPress: () => {
-            Alert.alert('Account Deletion', 'Account deletion request has been submitted. You will receive a confirmation email.');
+            Alert.alert(t('profile.accountDeletion'), t('profile.accountDeletionMessage'));
           }
         },
       ]
@@ -272,22 +276,51 @@ export default function Profile() {
 
   const handleAdvancedPress = () => {
     Alert.alert(
-      'Advanced Settings',
-      'Select an option:',
+      t('profile.advancedSettings'),
+      t('profile.selectOption'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.cancel'), style: 'cancel' },
         {
-          text: 'Data Management',
-          onPress: () => Alert.alert('Coming Soon', 'Data management features will be available soon!')
+          text: t('profile.dataManagement'),
+          onPress: () => Alert.alert(t('profile.comingSoon'), t('profile.dataManagementMessage'))
         },
         {
-          text: 'Delete Account',
+          text: t('profile.deleteAccount'),
           style: 'destructive',
           onPress: handleDeleteAccount
         },
       ]
     );
   };
+
+  // Show loading state while user data is being fetched
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show error state if not authenticated
+  if (!isAuthenticated || !user) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Please log in to view your profile</Text>
+          <TouchableOpacity 
+            style={styles.loginButton}
+            onPress={() => router.replace('/auth/phone' as any)}
+          >
+            <Text style={styles.loginButtonText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -331,13 +364,13 @@ export default function Profile() {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{user?.totalReports || 0}</Text>
-            <Text style={styles.statLabel}>Complaints</Text>
-            <Text style={styles.statSubLabel}>Submitted</Text>
+            <Text style={styles.statLabel}>{t('profile.complaints')}</Text>
+            <Text style={styles.statSubLabel}>{t('profile.submitted')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statNumber}>{user?.resolvedReports || 0}</Text>
-            <Text style={styles.statLabel}>Resolved</Text>
-            <Text style={styles.statSubLabel}>Total</Text>
+            <Text style={styles.statLabel}>{t('profile.resolved')}</Text>
+            <Text style={styles.statSubLabel}>{t('profile.total')}</Text>
           </View>
           {/* <View style={styles.statCard}>
             <Text style={styles.statNumber}>{(user?.totalReports || 0) - (user?.resolvedReports || 0)}</Text>
@@ -348,7 +381,7 @@ export default function Profile() {
 
         {/* Settings Options */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Settings</Text>
+          <Text style={styles.sectionTitle}>{t('profile.settings')}</Text>
           {profileOptions.map((option) => (
             <TouchableOpacity
               key={option.id}
@@ -380,14 +413,14 @@ export default function Profile() {
             activeOpacity={0.8}
           >
             <Ionicons name="log-out-outline" size={20} color="#F44336" />
-            <Text style={styles.logoutText}>Logout</Text>
+            <Text style={styles.logoutText}>{t('profile.logout')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* App Version */}
         <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>Civic Reporter v1.0.0</Text>
-          <Text style={styles.copyrightText}>© 2024 Civic Solutions</Text>
+          <Text style={styles.versionText}>{t('profile.version')}</Text>
+          <Text style={styles.copyrightText}>{t('profile.copyright')}</Text>
         </View>
       </ScrollView>
 
@@ -777,5 +810,42 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 20,
+    fontWeight: '500',
+  },
+  loginButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

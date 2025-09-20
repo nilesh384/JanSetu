@@ -118,7 +118,7 @@ export const getUserReports = async (userId, options = {}) => {
     const response = await apiClient.get(`/reports/user/${userId}`, { params });
 
     console.log('� Response status:', response.status);
-    console.log('📄 Response data:', response.data);
+    // console.log('📄 Response data:', response.data);
 
     return {
       success: true,
@@ -170,7 +170,7 @@ export const getReportById = async (reportId) => {
     const response = await apiClient.get(`/reports/${reportId}`);
 
     console.log('📥 Response status:', response.status);
-    console.log('� Response data:', response.data);
+    // console.log('� Response data:', response.data);
 
     return {
       success: true,
@@ -292,7 +292,7 @@ export const getNearbyReports = async (location, radius = 5, options = {}) => {
     const response = await apiClient.get('/reports/nearby', { params });
 
     console.log('📥 Response status:', response.status);
-    console.log('📄 Response data:', response.data);
+    // console.log('📄 Response data:', response.data);
 
     // Handle backend response structure
     if (response.data && response.data.success && response.data.reports) {
@@ -353,7 +353,7 @@ export const getUserReportsStats = async (userId) => {
     const response = await apiClient.get(`/reports/user/${userId}/stats`);
 
     console.log('📥 Response status:', response.status);
-    console.log('� Response data:', response.data);
+    // console.log('� Response data:', response.data);
 
     return {
       success: true,
@@ -407,7 +407,7 @@ export const updateReport = async (reportId, updateData, userId) => {
     });
 
     console.log('📥 Response status:', response.status);
-    console.log('📄 Response data:', response.data);
+    // console.log('📄 Response data:', response.data);
 
     return {
       success: true,
@@ -455,7 +455,7 @@ export const getCommunityStats = async () => {
     const response = await apiClient.get('/reports/community-stats');
 
     console.log('📥 Response status:', response.status);
-    console.log('� Response data:', response.data);
+    // console.log('� Response data:', response.data);
 
     return {
       success: true,

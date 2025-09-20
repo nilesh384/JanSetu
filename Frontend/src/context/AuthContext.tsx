@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { getUserById } from '../api/user.js';
+import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 // Types for TypeScript - Updated to match database schema
 interface User {
@@ -22,6 +25,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   requiresProfileSetup: boolean;
+  hasNetworkError: boolean;
   login: (userData: User, requiresProfileSetup?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   checkAuthStatus: () => Promise<void>;
@@ -43,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [requiresProfileSetup, setRequiresProfileSetup] = useState(false);
+  const [hasNetworkError, setHasNetworkError] = useState(false);
 
   // Check if user is authenticated
   const isAuthenticated = !!user;
@@ -81,48 +86,95 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🔐 No stored authentication found');
       }
     } catch (error) {
-      console.error('❌ Error checking auth status:', error);
-      await clearAuthStorage();
+      const errorMessage = (error as Error).message;
+      console.error('❌ Error checking auth status:', errorMessage);
+
+      // Check if it's a network error
+      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
+                            errorMessage.toLowerCase().includes('connection') ||
+                            errorMessage.toLowerCase().includes('timeout') ||
+                            errorMessage.toLowerCase().includes('fetch');
+
+      if (isNetworkError) {
+        console.log('🌐 Network error during auth check, will retry when online');
+        setHasNetworkError(true);
+        // Keep loading state true for network errors
+      } else {
+        // Only clear auth data for non-network errors
+        console.log('❌ Non-network error during auth check, clearing auth data');
+        setIsLoading(false); // Clear loading state for non-network errors
+        await clearAuthStorage();
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
   // Refresh user data from database
-  const refreshUser = async (userId?: string) => {
+  const refreshUser = async (userId?: string, retryCount = 0) => {
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
+
     try {
       const userIdToUse = userId || user?.id;
       if (!userIdToUse) {
         throw new Error('No user ID available');
       }
 
-      console.log('🔄 Refreshing user data from database...');
+      console.log(`🔄 Refreshing user data from database... (attempt ${retryCount + 1})`);
       const result = await getUserById(userIdToUse) as any;
-      
+
       if (result.success && result.user) {
         setUser(result.user);
         setRequiresProfileSetup(result.requiresProfileSetup || false);
-        
+        setHasNetworkError(false); // Clear network error on success
+        setIsLoading(false); // Clear loading state on success
+
         // Update profile setup requirement in storage
         await AsyncStorage.setItem(
-          STORAGE_KEYS.REQUIRES_PROFILE_SETUP, 
+          STORAGE_KEYS.REQUIRES_PROFILE_SETUP,
           String(result.requiresProfileSetup || false)
         );
-        
+
         console.log('✅ User data refreshed successfully');
+        return; // Success, exit function
       } else {
         throw new Error(result.message || 'Failed to fetch user data');
       }
     } catch (error) {
-      console.error('❌ Error refreshing user data:', error);
-      // If we can't fetch user data, clear the session
-      await clearAuthStorage();
-      setUser(null);
-      setRequiresProfileSetup(false);
-    }
-  };
+      const errorMessage = (error as Error).message;
+      console.error(`❌ Error refreshing user data (attempt ${retryCount + 1}):`, errorMessage);
 
-  // Login function (called after successful OTP verification)
+      // Check if it's a network-related error
+      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
+                            errorMessage.toLowerCase().includes('connection') ||
+                            errorMessage.toLowerCase().includes('timeout') ||
+                            errorMessage.toLowerCase().includes('fetch') ||
+                            !navigator.onLine; // Check if browser reports offline
+
+      if (isNetworkError && retryCount < maxRetries) {
+        console.log(`🌐 Network error detected, retrying in ${retryDelay}ms... (${retryCount + 1}/${maxRetries})`);
+        setHasNetworkError(true);
+        // Keep loading state true during retries
+
+        // Retry after delay
+        setTimeout(() => {
+          refreshUser(userId, retryCount + 1);
+        }, retryDelay);
+        return; // Don't clear auth data on network errors
+      }
+
+      // If it's not a network error or we've exhausted retries, handle as auth error
+      if (!isNetworkError || retryCount >= maxRetries) {
+        console.log('❌ Non-network error or max retries reached, clearing auth data');
+        setHasNetworkError(false); // Clear network error flag
+        setIsLoading(false); // Clear loading state
+        await clearAuthStorage();
+        setUser(null);
+        setRequiresProfileSetup(false);
+      }
+    }
+  };  // Login function (called after successful OTP verification)
   const login = async (userData: User, requiresProfileSetupFlag?: boolean) => {
     try {
       console.log('🔐 Starting login process for user:', userData.id);
@@ -184,11 +236,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuthStatus();
   }, []);
 
+  // Network monitoring for retry logic
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      const isOnline = state.isConnected && state.isInternetReachable;
+
+      if (isOnline && hasNetworkError && user?.id) {
+        console.log('🌐 Network restored, retrying user data refresh...');
+        setHasNetworkError(false);
+        // Keep loading state true during retry
+        refreshUser(user.id, 0);
+      } else if (isOnline && hasNetworkError && !user?.id) {
+        // If we have network but no user, try to check auth status again
+        console.log('🌐 Network restored, checking auth status...');
+        setHasNetworkError(false);
+        checkAuthStatus();
+      }
+    });
+
+    return () => unsubscribe();
+  }, [hasNetworkError, user?.id]);
+
   const value: AuthContextType = {
     user,
     isLoading,
     isAuthenticated,
     requiresProfileSetup,
+    hasNetworkError,
     login,
     logout,
     checkAuthStatus,
@@ -210,5 +284,40 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+// Loading component with network error display
+export const AuthLoadingScreen: React.FC = () => {
+  const { isLoading, hasNetworkError } = useAuth();
+  const { t } = useTranslation();
+
+  if (!isLoading) return null;
+
+  return (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#FF6B35" />
+      {hasNetworkError && (
+        <Text style={styles.networkErrorText}>
+          {t('post.networkConnectionIssue')}
+        </Text>
+      )}
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+  },
+  networkErrorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+});
 
 export default AuthContext;
