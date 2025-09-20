@@ -18,10 +18,13 @@ import {
 } from 'react-native';
 
 import { useRouter } from 'expo-router';
+import NetInfo from '@react-native-community/netinfo';
 
 import { createReport } from '../../api/report.js';
 import { uploadReportMedia } from '../../api/media';
 import { useAuth } from '@/src/context/AuthContext';
+import { useTranslation } from 'react-i18next';
+import offlineStorage from '../../services/offlineStorage';
 
 interface LocationData {
   latitude: number;
@@ -29,110 +32,111 @@ interface LocationData {
   address?: string;
 }
 
-const issueCategories = [
-  { 
-    id: 1, 
-    name: "Roads & Infrastructure", 
-    description: "Report potholes, damaged pavements, unsafe road conditions, or encroachments.",
-    department: "Municipal Engineering Division",
-    icon: 'map'
-  },
-  { 
-    id: 2, 
-    name: "Street Lighting & Electrical", 
-    description: "Non-functional streetlights, exposed wires, or electrical pole issues.",
-    department: "Municipal Electrical Wing",
-    icon: 'lightbulb'
-  },
-  { 
-    id: 3, 
-    name: "Sanitation & Waste", 
-    description: "Overflowing garbage bins, irregular pickup, open drains, or illegal dumping.",
-    department: "Municipal Sanitation Department",
-    icon: 'delete'
-  },
-  { 
-    id: 4, 
-    name: "Water Supply & Sewerage", 
-    description: "Water leakage, blocked sewers, no water supply, or contaminated water.",
-    department: "Municipal Water Supply & Sewerage",
-    icon: 'water'
-  },
-  { 
-    id: 5, 
-    name: "Public Health & Hygiene", 
-    description: "Mosquito breeding, stagnant water, animal carcasses, or unhygienic surroundings.",
-    department: "Municipal Health Department",
-    icon: 'healing'
-  },
-  { 
-    id: 6, 
-    name: "Parks & Greenery", 
-    description: "Unmaintained parks, broken benches, damaged trees, or need for plantation.",
-    department: "Municipal Horticulture Division",
-    icon: 'park'
-  },
-  { 
-    id: 7, 
-    name: "Traffic & Transport", 
-    description: "Broken signals, missing signage, illegal parking, or road encroachments.",
-    department: "Municipal Traffic Engineering Division",
-    icon: 'traffic'
-  },
-  { 
-    id: 8, 
-    name: "Public Safety & Emergency", 
-    description: "Fire hazards, building collapse, unsafe structures, or accidents.",
-    department: "Fire & Emergency Services",
-    icon: 'warning'
-  },
-  { 
-    id: 9, 
-    name: "Education & Amenities", 
-    description: "Damaged school toilets, poor upkeep of libraries, or community halls.",
-    department: "Municipal Public Amenities Department",
-    icon: 'school'
-  },
-  { 
-    id: 10, 
-    name: "Encroachments & Illegal Constructions", 
-    description: "Unauthorized shops, hawkers blocking pathways, or illegal structures.",
-    department: "Municipal Urban Planning & Encroachment Removal",
-    icon: 'domain'
-  },
-  { 
-    id: 11, 
-    name: "Environment & Pollution", 
-    description: "Air/noise pollution, waste burning, or polluted lakes and ponds.",
-    department: "Municipal Environment Cell",
-    icon: 'public'
-  },
-  { 
-    id: 12, 
-    name: "Animal Control", 
-    description: "Stray dogs, cattle menace, or injured/abandoned animals.",
-    department: "Municipal Veterinary Department",
-    icon: 'pets'
-  },
-  { 
-    id: 13, 
-    name: "Citizen Services", 
-    description: "Delays in birth/death certificates, property tax disputes, billing issues.",
-    department: "Municipal Citizen Service Centre",
-    icon: 'assignment'
-  },
-  { 
-    id: 14, 
-    name: "Others", 
-    description: "Any issues excluding the given categories",
-    department: "General Administrative Office",
-    icon: 'ellipsis-horizontal'
-  }
-];
-
 export default function Post() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
+
+  const issueCategories = [
+    { 
+      id: 1, 
+      name: t('profile.categoryRoadsInfrastructure'), 
+      description: t('profile.categoryRoadsDesc'),
+      department: t('profile.categoryRoadsDept'),
+      icon: 'map'
+    },
+    { 
+      id: 2, 
+      name: t('profile.categoryLighting'), 
+      description: t('profile.categoryLightingDesc'),
+      department: t('profile.categoryLightingDept'),
+      icon: 'lightbulb'
+    },
+    { 
+      id: 3, 
+      name: t('profile.categorySanitation'), 
+      description: t('profile.categorySanitationDesc'),
+      department: t('profile.categorySanitationDept'),
+      icon: 'delete'
+    },
+    { 
+      id: 4, 
+      name: t('profile.categoryWater'), 
+      description: t('profile.categoryWaterDesc'),
+      department: t('profile.categoryWaterDept'),
+      icon: 'water'
+    },
+    { 
+      id: 5, 
+      name: t('profile.categoryHealth'), 
+      description: t('profile.categoryHealthDesc'),
+      department: t('profile.categoryHealthDept'),
+      icon: 'healing'
+    },
+    { 
+      id: 6, 
+      name: t('profile.categoryParks'), 
+      description: t('profile.categoryParksDesc'),
+      department: t('profile.categoryParksDept'),
+      icon: 'park'
+    },
+    { 
+      id: 7, 
+      name: t('profile.categoryTraffic'), 
+      description: t('profile.categoryTrafficDesc'),
+      department: t('profile.categoryTrafficDept'),
+      icon: 'traffic'
+    },
+    { 
+      id: 8, 
+      name: t('profile.categorySafety'), 
+      description: t('profile.categorySafetyDesc'),
+      department: t('profile.categorySafetyDept'),
+      icon: 'warning'
+    },
+    { 
+      id: 9, 
+      name: t('profile.categoryEducation'), 
+      description: t('profile.categoryEducationDesc'),
+      department: t('profile.categoryEducationDept'),
+      icon: 'school'
+    },
+    { 
+      id: 10, 
+      name: t('profile.categoryEncroachments'), 
+      description: t('profile.categoryEncroachmentsDesc'),
+      department: t('profile.categoryEncroachmentsDept'),
+      icon: 'domain'
+    },
+    { 
+      id: 11, 
+      name: t('profile.categoryEnvironment'), 
+      description: t('profile.categoryEnvironmentDesc'),
+      department: t('profile.categoryEnvironmentDept'),
+      icon: 'public'
+    },
+    { 
+      id: 12, 
+      name: t('profile.categoryAnimal'), 
+      description: t('profile.categoryAnimalDesc'),
+      department: t('profile.categoryAnimalDept'),
+      icon: 'pets'
+    },
+    { 
+      id: 13, 
+      name: t('profile.categoryServices'), 
+      description: t('profile.categoryServicesDesc'),
+      department: t('profile.categoryServicesDept'),
+      icon: 'assignment'
+    },
+    { 
+      id: 14, 
+      name: t('profile.categoryOthers'), 
+      description: t('profile.categoryOthersDesc'),
+      department: t('profile.categoryOthersDept'),
+      icon: 'ellipsis-horizontal'
+    }
+  ];
   
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [title, setTitle] = useState('');
@@ -144,6 +148,8 @@ export default function Post() {
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  const [offlineReportsCount, setOfflineReportsCount] = useState(0);
 
   
   // Audio recording states
@@ -172,6 +178,36 @@ export default function Post() {
       }
     };
   }, [recording, playbackSound]);
+
+  // Network monitoring and offline reports count
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(!!(state.isConnected && state.isInternetReachable));
+    });
+
+    // Update offline reports count
+    const updateOfflineCount = async () => {
+      const count = await offlineStorage.getOfflineReportsCount();
+      setOfflineReportsCount(count);
+    };
+
+    updateOfflineCount();
+
+    // Check for pending reports when component mounts
+    const checkPendingReports = async () => {
+      const isOnline = await offlineStorage.checkNetworkStatus();
+      if (isOnline) {
+        const pendingCount = await offlineStorage.getPendingReportsCount();
+        if (pendingCount > 0) {
+          console.log(`📤 Found ${pendingCount} pending reports, user can upload manually`);
+        }
+      }
+    };
+
+    checkPendingReports();
+
+    return () => unsubscribe();
+  }, []);
 
   const getCurrentLocation = async () => {
     setIsLocationLoading(true);
@@ -220,9 +256,9 @@ export default function Post() {
       setLocation({
         latitude: 0,
         longitude: 0,
-        address: 'Location unavailable - Please enable GPS and retry',
+        address: t('post.locationUnavailable'),
       });
-      Alert.alert('Location Error', 'Unable to get current location. Please check GPS settings and try again.');
+      Alert.alert(t('post.locationError'));
     } finally {
       setIsLocationLoading(false);
     }
@@ -230,7 +266,7 @@ export default function Post() {
 
   const pickMedia = async () => {
     if (mediaItems.length >= 3) {
-      Alert.alert('Limit Reached', 'You can only add up to 3 photos/videos');
+      Alert.alert(t('post.limitReached'));
       return;
     }
 
@@ -240,25 +276,25 @@ export default function Post() {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (permissionResult.granted === false) {
-      Alert.alert('Permission Required', 'Camera roll permission is required to select media');
+      Alert.alert(t('post.permissionRequired'));
       return;
     }
 
     const options: any[] = [
-      { text: 'Take Photo', onPress: () => openCamera('image') },
-      { text: 'Choose Photo', onPress: () => openMediaPicker('image') },
+      { text: t('post.takePhoto'), onPress: () => openCamera('image') },
+      { text: t('post.choosePhoto'), onPress: () => openMediaPicker('image') },
     ];
 
     if (!hasVideo) {
-      options.splice(1, 0, { text: 'Record Video', onPress: () => openCamera('video') });
-      options.splice(3, 0, { text: 'Choose Video', onPress: () => openMediaPicker('video') });
+      options.splice(1, 0, { text: t('post.recordVideo'), onPress: () => openCamera('video') });
+      options.splice(3, 0, { text: t('post.chooseVideo'), onPress: () => openMediaPicker('video') });
     }
 
-    options.push({ text: 'Cancel', style: 'cancel' });
+    options.push({ text: t('post.cancel'), style: 'cancel' });
 
     Alert.alert(
-      'Select Media',
-      hasVideo ? 'You can only add one video. Add photos only.' : 'Choose how you want to add media',
+      t('post.selectMedia'),
+      hasVideo ? t('post.videoLimit') : t('post.mediaSubtitle'),
       options
     );
   };
@@ -266,13 +302,13 @@ export default function Post() {
   const openCamera = async (mediaType: 'image' | 'video') => {
     // Check video limit
     if (mediaType === 'video' && mediaItems.some(item => item.type === 'video')) {
-      Alert.alert('Video Limit', 'You can only add one video. Remove the existing video to add a new one.');
+      Alert.alert(t('post.videoLimit'));
       return;
     }
 
     const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
     if (cameraPermission.granted === false) {
-      Alert.alert('Permission Required', 'Camera permission is required to capture media');
+      Alert.alert(t('post.cameraPermissionRequired'));
       return;
     }
 
@@ -498,10 +534,157 @@ export default function Post() {
       return false;
     }
     if (!location) {
-      Alert.alert('Missing Location', 'Location is required to submit a report');
+      Alert.alert(t('post.missingLocation'));
       return false;
     }
     return true;
+  };
+
+  // Submit report when online
+  const submitOnlineReport = async () => {
+    let uploadedMediaUrls: string[] = [];
+    let uploadedAudioUrl: string = '';
+
+    // Step 1: Upload media files to Cloudinary if any exist
+    if (mediaItems.length > 0 || recordingUri) {
+      setIsUploadingMedia(true);
+      setUploadProgress(t('post.uploadingMedia'));
+      console.log('📁 Uploading media files to Cloudinary...');
+      
+      // Retry logic for media upload
+      let uploadAttempts = 0;
+      const maxRetries = 3;
+      let uploadResult = null;
+      
+      while (uploadAttempts < maxRetries && !uploadResult?.success) {
+        try {
+          uploadAttempts++;
+          if (uploadAttempts > 1) {
+            setUploadProgress(t('post.retryingUpload', { attempt: uploadAttempts, max: maxRetries }));
+          }
+          
+          uploadResult = await uploadReportMedia(mediaItems, recordingUri || undefined, user?.id || '');
+          
+          if (uploadResult.success) {
+            break;
+          }
+        } catch (retryError) {
+          console.error(`Upload attempt ${uploadAttempts} failed:`, retryError);
+          if (uploadAttempts === maxRetries) {
+            throw new Error(`Failed to upload media after ${maxRetries} attempts: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts));
+        }
+      }
+      
+      if (!uploadResult?.success) {
+        throw new Error(uploadResult?.message || 'Failed to upload media files after multiple attempts');
+      }
+
+      uploadedMediaUrls = uploadResult.mediaUrls || [];
+      uploadedAudioUrl = uploadResult.audioUrl || '';
+      
+      console.log('✅ Media uploaded successfully:', {
+        mediaUrls: uploadedMediaUrls,
+        audioUrl: uploadedAudioUrl
+      });
+      
+      setIsUploadingMedia(false);
+      setUploadProgress(t('post.mediaUploaded'));
+    }
+
+    // Get department from selected category
+    const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
+    
+    setUploadProgress(t('post.creatingReport'));
+    
+    // Step 2: Create report data with Cloudinary URLs
+    const reportData = {
+      userId: user?.id || '',
+      title: title.trim(),
+      description: description.trim(),
+      category: selectedCategoryData?.name || 'Others',
+      priority: 'auto',
+      latitude: location?.latitude || 0,
+      longitude: location?.longitude || 0,
+      address: location?.address || '',
+      department: selectedCategoryData?.department || 'General Administrative Office',
+      mediaUrls: uploadedMediaUrls,
+      audioUrl: uploadedAudioUrl
+    };
+
+    // Step 3: Call the actual API to create the report with retry logic
+    let reportAttempts = 0;
+    const maxReportRetries = 2;
+    let reportResponse = null;
+    
+    while (reportAttempts < maxReportRetries && !reportResponse) {
+      try {
+        reportAttempts++;
+        if (reportAttempts > 1) {
+          setUploadProgress(t('post.retryingReport', { attempt: reportAttempts, max: maxReportRetries }));
+        }
+        
+        reportResponse = await createReport(reportData);
+        break;
+      } catch (reportError) {
+        console.error(`Report creation attempt ${reportAttempts} failed:`, reportError);
+        if (reportAttempts === maxReportRetries) {
+          throw new Error(`Failed to create report after ${maxReportRetries} attempts: ${reportError instanceof Error ? reportError.message : 'Unknown error'}`);
+        }
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+
+    setUploadProgress(t('post.reportSubmitted'));
+
+    Alert.alert(
+      t('post.reportSubmitted'),
+      `Your report has been submitted!\n\nAssigned to: ${selectedCategoryData?.department}\nYou will receive updates on the progress.`,
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            // Reset form
+            setTitle('');
+            setDescription('');
+            setSelectedCategory(null);
+            setMediaItems([]);
+            removeRecording();
+            setUploadProgress('');
+            // Navigate back or to home
+            router.back();
+          },
+        },
+      ]
+    );
+  };
+
+  // Handle manual upload of pending reports
+  const handleAutoUpload = async () => {
+    try {
+      setIsSubmitting(true);
+      await offlineStorage.triggerAutoUpload();
+      
+      // Refresh the count
+      const count = await offlineStorage.getOfflineReportsCount();
+      setOfflineReportsCount(count);
+      
+      Alert.alert(
+        t('post.uploadSuccess'),
+        t('post.allReportsUploaded')
+      );
+    } catch (error) {
+      console.error('Auto upload failed:', error);
+      Alert.alert(
+        t('post.uploadFailed'),
+        (error as Error).message || t('post.tryAgainLater')
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const submitReport = async () => {
@@ -512,145 +695,144 @@ export default function Post() {
     setUploadProgress('');
     
     try {
-      let uploadedMediaUrls: string[] = [];
-      let uploadedAudioUrl: string = '';
-
-      // Step 1: Upload media files to Cloudinary if any exist
-      if (mediaItems.length > 0 || recordingUri) {
-        setIsUploadingMedia(true);
-        setUploadProgress('Uploading media files...');
-        console.log('📁 Uploading media files to Cloudinary...');
-        
-        // Retry logic for media upload
-        let uploadAttempts = 0;
-        const maxRetries = 3;
-        let uploadResult = null;
-        
-        while (uploadAttempts < maxRetries && !uploadResult?.success) {
-          try {
-            uploadAttempts++;
-            if (uploadAttempts > 1) {
-              setUploadProgress(`Retrying upload... (${uploadAttempts}/${maxRetries})`);
-            }
-            
-            uploadResult = await uploadReportMedia(mediaItems, recordingUri || undefined, user?.id || '');
-            
-            if (uploadResult.success) {
-              break;
-            }
-          } catch (retryError) {
-            console.error(`Upload attempt ${uploadAttempts} failed:`, retryError);
-            if (uploadAttempts === maxRetries) {
-              throw new Error(`Failed to upload media after ${maxRetries} attempts: ${retryError instanceof Error ? retryError.message : 'Unknown error'}`);
-            }
-            // Wait before retry
-            await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts));
-          }
-        }
-        
-        if (!uploadResult?.success) {
-          throw new Error(uploadResult?.message || 'Failed to upload media files after multiple attempts');
-        }
-
-        uploadedMediaUrls = uploadResult.mediaUrls || [];
-        uploadedAudioUrl = uploadResult.audioUrl || '';
-        
-        console.log('✅ Media uploaded successfully:', {
-          mediaUrls: uploadedMediaUrls,
-          audioUrl: uploadedAudioUrl
-        });
-        
-        setIsUploadingMedia(false);
-        setUploadProgress('Media uploaded successfully!');
-      }
-
-      // Get department from selected category
-      const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
+      // Check network status
+      const networkStatus = await offlineStorage.checkNetworkStatus();
       
-      setUploadProgress('Creating report...');
-      
-      // Step 2: Create report data with Cloudinary URLs
-      const reportData = {
-        userId: user?.id || '',
-        title: title.trim(),
-        description: description.trim(),
-        category: selectedCategoryData?.name || 'Others',
-        priority: 'auto',
-        latitude: location?.latitude || 0,
-        longitude: location?.longitude || 0,
-        address: location?.address || '',
-        department: selectedCategoryData?.department || 'General Administrative Office',
-        mediaUrls: uploadedMediaUrls,
-        audioUrl: uploadedAudioUrl
-      };
+      if (!networkStatus) {
+        // Offline: Save report locally
+        console.log('📱 Device is offline, saving report locally...');
+        
+        const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
+        
+        const reportData = {
+          userId: user?.id || '',
+          title: title.trim(),
+          description: description.trim(),
+          category: selectedCategoryData?.name || 'Others',
+          priority: 'auto',
+          latitude: location?.latitude || 0,
+          longitude: location?.longitude || 0,
+          address: location?.address || '',
+          department: selectedCategoryData?.department || 'General Administrative Office',
+          mediaUrls: [], // Will be uploaded when online
+          audioUrl: '', // Will be uploaded when online
+          // Store original media data for later upload
+          mediaItems: mediaItems,
+          recordingUri: recordingUri
+        };
 
-      // Step 3: Call the actual API to create the report with retry logic
-      let reportAttempts = 0;
-      const maxReportRetries = 2;
-      let reportResponse = null;
-      
-      while (reportAttempts < maxReportRetries && !reportResponse) {
-        try {
-          reportAttempts++;
-          if (reportAttempts > 1) {
-            setUploadProgress(`Retrying report creation... (${reportAttempts}/${maxReportRetries})`);
-          }
-          
-          reportResponse = await createReport(reportData);
-          break;
-        } catch (reportError) {
-          console.error(`Report creation attempt ${reportAttempts} failed:`, reportError);
-          if (reportAttempts === maxReportRetries) {
-            throw new Error(`Failed to create report after ${maxReportRetries} attempts: ${reportError instanceof Error ? reportError.message : 'Unknown error'}`);
-          }
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
-      setUploadProgress('Report submitted successfully!');
-
-      Alert.alert(
-        'Report Submitted Successfully!',
-        `Your report has been submitted!\n\nAssigned to: ${selectedCategoryData?.department}\nYou will receive updates on the progress.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Reset form
-              setTitle('');
-              setDescription('');
-              setSelectedCategory(null);
-              setMediaItems([]);
-              removeRecording();
-              setUploadProgress('');
-              // Navigate back or to home
-              router.back();
+        const offlineId = await offlineStorage.saveOfflineReport(reportData);
+        
+        Alert.alert(
+          t('post.reportSavedOffline'),
+          t('post.reportWillUploadWhenOnline'),
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Reset form
+                setTitle('');
+                setDescription('');
+                setSelectedCategory(null);
+                setMediaItems([]);
+                removeRecording();
+                setUploadProgress('');
+                setOfflineReportsCount(prev => prev + 1);
+                router.back();
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+        
+        return;
+      }
+
+      // Online: Proceed with normal submission
+      await submitOnlineReport();
+      
     } catch (error) {
-      console.error('Error submitting report:', error);
+      console.error('Error in submitReport:', error);
       const errorMessage = (error instanceof Error) ? error.message : 'Please check your connection and try again';
       setUploadProgress('');
       setIsUploadingMedia(false);
       
-      // Show retry option for network errors
-      Alert.alert(
-        'Submission Failed',
-        errorMessage,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Retry',
-            onPress: () => submitReport(),
-          },
-        ]
-      );
+      // If it's a network error, offer to save offline
+      if (errorMessage.toLowerCase().includes('network') || 
+          errorMessage.toLowerCase().includes('connection') ||
+          errorMessage.toLowerCase().includes('timeout')) {
+        
+        Alert.alert(
+          t('post.networkError'),
+          t('post.saveOfflineQuestion'),
+          [
+            {
+              text: t('common.cancel'),
+              style: 'cancel',
+            },
+            {
+              text: t('post.saveOffline'),
+              onPress: async () => {
+                try {
+                  const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
+                  
+                  const reportData = {
+                    userId: user?.id || '',
+                    title: title.trim(),
+                    description: description.trim(),
+                    category: selectedCategoryData?.name || 'Others',
+                    priority: 'auto',
+                    latitude: location?.latitude || 0,
+                    longitude: location?.longitude || 0,
+                    address: location?.address || '',
+                    department: selectedCategoryData?.department || 'General Administrative Office',
+                    mediaUrls: [],
+                    audioUrl: '',
+                    mediaItems: mediaItems,
+                    recordingUri: recordingUri
+                  };
+
+                  const offlineId = await offlineStorage.saveOfflineReport(reportData);
+                  setOfflineReportsCount(prev => prev + 1);
+                  
+                  Alert.alert(
+                    t('post.reportSavedOffline'),
+                    t('post.reportWillUploadWhenOnline')
+                  );
+                  
+                  // Reset form
+                  setTitle('');
+                  setDescription('');
+                  setSelectedCategory(null);
+                  setMediaItems([]);
+                  removeRecording();
+                  setUploadProgress('');
+                  router.back();
+                  
+                } catch (offlineError) {
+                  console.error('Error saving offline:', offlineError);
+                  Alert.alert(t('error'), t('post.failedToSaveOffline'));
+                }
+              },
+            },
+          ]
+        );
+      } else {
+        // Non-network error, show regular retry option
+        Alert.alert(
+          t('post.submissionError'),
+          errorMessage,
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Retry',
+              onPress: () => submitReport(),
+            },
+          ]
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -664,20 +846,48 @@ export default function Post() {
   <TouchableOpacity onPress={() => router.back()}>
     <Ionicons name="arrow-back" size={24} color="#333" />
   </TouchableOpacity>
-  <Text style={styles.headerTitle}>Report Civic Issue</Text>
+  <Text style={styles.headerTitle}>{t('post.reportCivicIssue')}</Text>
   <View style={{ width: 24 }} />
 </View>
 
+        {/* Offline Status Banner */}
+        {!isOnline && (
+          <View style={styles.offlineBanner}>
+            <Ionicons name="cloud-offline" size={20} color="#fff" />
+            <Text style={styles.offlineText}>
+              {t('common.offline')} • {t('post.willUploadWhenOnline')}
+            </Text>
+            {offlineReportsCount > 0 && (
+              <Text style={styles.offlineCount}>
+                {offlineReportsCount} {t('post.pending')}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {/* Manual Upload Button for Online with Pending Reports */}
+        {isOnline && offlineReportsCount > 0 && (
+          <TouchableOpacity 
+            style={styles.manualUploadBanner}
+            onPress={handleAutoUpload}
+          >
+            <Ionicons name="cloud-upload" size={20} color="#fff" />
+            <Text style={styles.offlineText}>
+              {t('post.uploadPendingReports')} ({offlineReportsCount})
+            </Text>
+            <Ionicons name="chevron-forward" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
 
         {/* Issue Category Selection */}
         <View style={styles.section}>
-  <Text style={styles.sectionTitle}>Issue Category</Text>
+  <Text style={styles.sectionTitle}>{t('post.issueCategory')}</Text>
   <TouchableOpacity 
     style={styles.dropdownButton}
     onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
   >
     <Text style={styles.dropdownText}>
-      {selectedCategory !== null ? issueCategories.find(c => c.id === selectedCategory)?.name : 'Select Category'}
+      {selectedCategory !== null ? issueCategories.find(c => c.id === selectedCategory)?.name : t('post.selectCategory')}
     </Text>
     <Ionicons name="chevron-down" size={20} color="#666" />
   </TouchableOpacity>
@@ -710,10 +920,10 @@ export default function Post() {
 
         {/* Issue Title */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Issue Title</Text>
+          <Text style={styles.sectionTitle}>{t('post.issueTitle')}</Text>
           <TextInput
             style={styles.titleInput}
-            placeholder="Brief title describing the issue"
+            placeholder={t('post.titlePlaceholder')}
             value={title}
             onChangeText={setTitle}
             maxLength={100}
@@ -723,10 +933,10 @@ export default function Post() {
 
         {/* Issue Description */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Detailed Description</Text>
+          <Text style={styles.sectionTitle}>{t('post.detailedDescription')}</Text>
           <TextInput
             style={styles.descriptionInput}
-            placeholder="Provide detailed information about the issue, including when you noticed it and how it affects the community..."
+            placeholder={t('post.descriptionPlaceholder')}
             value={description}
             onChangeText={setDescription}
             multiline
@@ -738,8 +948,8 @@ export default function Post() {
 
         {/* Media Upload */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Photos & Videos</Text>
-          <Text style={styles.sectionSubtitle}>Add up to 3 photos/videos (max 30s for videos)</Text>
+          <Text style={styles.sectionTitle}>{t('post.photosVideos')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('post.mediaSubtitle')}</Text>
           
           {mediaItems.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaScrollView}>
@@ -769,9 +979,9 @@ export default function Post() {
           {mediaItems.length < 3 && (
             <TouchableOpacity style={styles.mediaUploadCard} onPress={pickMedia}>
               <MaterialIcons name="add-a-photo" size={32} color="#666666" />
-              <Text style={styles.mediaUploadText}>Add Media</Text>
+              <Text style={styles.mediaUploadText}>{t('post.addMedia')}</Text>
               <Text style={styles.mediaUploadSubtext}>
-                Photo/Video • {3 - mediaItems.length} remaining
+                {t('post.photosVideos')} • {3 - mediaItems.length} {t('post.remaining')}
               </Text>
             </TouchableOpacity>
           )}
@@ -779,8 +989,8 @@ export default function Post() {
 
         {/* Audio Recording */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Voice Recording</Text>
-          <Text style={styles.sectionSubtitle}>Add voice description (max 60 seconds)</Text>
+          <Text style={styles.sectionTitle}>{t('post.voiceRecording')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('post.voiceSubtitle')}</Text>
           
           {recordingUri ? (
             <View style={styles.audioContainer}>
@@ -796,7 +1006,7 @@ export default function Post() {
                   />
                 </TouchableOpacity>
                 <View style={styles.audioInfo}>
-                  <Text style={styles.audioTitle}>Voice Recording</Text>
+                  <Text style={styles.audioTitle}>{t('post.voiceRecordingTitle')}</Text>
                   <Text style={styles.audioDuration}>{formatDuration(recordingDuration)}</Text>
                 </View>
                 <TouchableOpacity style={styles.removeAudioButton} onPress={removeRecording}>
@@ -819,7 +1029,7 @@ export default function Post() {
               </View>
               <View style={styles.recordInfo}>
                 <Text style={[styles.recordText, isRecording && styles.recordingText]}>
-                  {isRecording ? "Recording..." : "Tap to Record"}
+                  {isRecording ? t('post.recording') : t('post.tapToRecord')}
                 </Text>
                 {isRecording && (
                   <Text style={styles.recordDuration}>
@@ -833,18 +1043,18 @@ export default function Post() {
 
         {/* Location */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location</Text>
+          <Text style={styles.sectionTitle}>{t('post.location')}</Text>
           <View style={styles.locationCard}>
             {isLocationLoading ? (
               <View style={styles.locationLoading}>
                 <ActivityIndicator size="small" color="#FF6B35" />
-                <Text style={styles.locationLoadingText}>Getting location...</Text>
+                <Text style={styles.locationLoadingText}>{t('post.gettingLocation')}</Text>
               </View>
             ) : location ? (
               <View style={styles.locationInfo}>
                 <Ionicons name="location" size={20} color="#4CAF50" />
                 <View style={styles.locationTextContainer}>
-                  <Text style={styles.locationText}>{location.address || 'Current Location'}</Text>
+                  <Text style={styles.locationText}>{location.address || t('post.currentLocation')}</Text>
                   <Text style={styles.coordinatesText}>
                     {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
                   </Text>
@@ -856,7 +1066,7 @@ export default function Post() {
             ) : (
               <TouchableOpacity style={styles.getLocationButton} onPress={getCurrentLocation}>
                 <Ionicons name="location-outline" size={20} color="#FF6B35" />
-                <Text style={styles.getLocationText}>Get Current Location</Text>
+                <Text style={styles.getLocationText}>{t('post.getCurrentLocation')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -873,13 +1083,15 @@ export default function Post() {
               <View style={styles.submitLoadingContainer}>
                 <ActivityIndicator size="small" color="#FFFFFF" />
                 <Text style={styles.submitButtonText}>
-                  {isUploadingMedia ? 'Uploading...' : uploadProgress || 'Submitting...'}
+                  {isUploadingMedia ? t('post.uploading') : uploadProgress || t('post.submitting')}
                 </Text>
               </View>
             ) : (
               <View style={styles.submitContentContainer}>
                 <Ionicons name="send" size={20} color="#FFFFFF" />
-                <Text style={styles.submitButtonText}>Submit Report</Text>
+                <Text style={styles.submitButtonText}>
+                  {isOnline ? t('post.submitReport') : t('post.saveOffline')}
+                </Text>
               </View>
             )}
           </TouchableOpacity>
@@ -889,7 +1101,7 @@ export default function Post() {
           )}
           
           <Text style={styles.submitNote}>
-            Your report will be automatically routed to the appropriate department and you'll receive updates on its status.
+            {t('post.submitNote')}
           </Text>
         </View>
       </ScrollView>
@@ -921,6 +1133,42 @@ headerTitle: {
   fontSize: 20,
   fontWeight: 'bold',
   color: '#333',
+},
+offlineBanner: {
+  backgroundColor: '#FF6B35',
+  padding: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginHorizontal: 20,
+  marginTop: 10,
+  borderRadius: 8,
+},
+offlineText: {
+  color: '#fff',
+  fontSize: 14,
+  fontWeight: '500',
+  flex: 1,
+  marginLeft: 8,
+},
+offlineCount: {
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 'bold',
+  backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  paddingHorizontal: 8,
+  paddingVertical: 4,
+  borderRadius: 12,
+},
+manualUploadBanner: {
+  backgroundColor: '#4CAF50',
+  padding: 12,
+  flexDirection: 'row',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  marginHorizontal: 20,
+  marginTop: 10,
+  borderRadius: 8,
 },
 section: {
     padding: 20,

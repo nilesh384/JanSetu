@@ -8,6 +8,8 @@ import { getNearbyReports, getCommunityStats } from '@/src/api/report';
 import { useAuth } from '@/src/context/AuthContext';
 import { Report } from '@/src/types/report';
 import { formatTimeAgo, parseServerDate } from '@/src/utils/date';
+import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { useTranslation } from 'react-i18next';
 
 interface ExtendedReport extends Report {
   distance?: number;
@@ -26,6 +28,7 @@ interface CommunityStatsResponse {
 
 export default function Home() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [nearbyReports, setNearbyReports] = useState<ExtendedReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -147,6 +150,11 @@ export default function Home() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Language Switcher positioned outside ScrollView */}
+      <View style={styles.languageSwitcherContainer}>
+        <LanguageSwitcher />
+      </View>
+
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <HomeHeader userName="Rahul" />
 
@@ -205,9 +213,9 @@ export default function Home() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitle}>
-                <Text style={styles.sectionTitleText}>Recent Nearby Reports</Text>
+                <Text style={styles.sectionTitleText}>{t('home.recentNearbyReports')}</Text>
                 <TouchableOpacity onPress={() => router.push('/complaints/nearby')}>
-                    <Text style={styles.viewAllText}>View All</Text>
+                    <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -216,13 +224,13 @@ export default function Home() {
               {loading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color="#2563EB" />
-                  <Text style={styles.loadingText}>Loading nearby reports...</Text>
+                  <Text style={styles.loadingText}>{t('home.loadingNearbyReports')}</Text>
                 </View>
               ) : nearbyReports.length > 0 ? (
                 nearbyReports.map((report) => {
                   const statusColor = report.isResolved ? '#059669' : '#D97706';
                   const statusBgColor = report.isResolved ? '#DCFCE7' : '#FEF3C7';
-                  const statusText = report.isResolved ? 'Resolved' : 'In Progress';
+                  const statusText = report.isResolved ? t('home.resolved') : t('home.inProgress');
                   const statusIcon = report.isResolved ? 'checkmark-circle' : 'time';
 
                   return (
@@ -256,8 +264,8 @@ export default function Home() {
               ) : (
                 <View style={styles.emptyState}>
                   <Ionicons name="location-outline" size={32} color="#CCCCCC" />
-                  <Text style={styles.emptyText}>No nearby reports found</Text>
-                  <Text style={styles.emptySubtext}>Check back later or expand your search area</Text>
+                  <Text style={styles.emptyText}>{t('home.noNearbyReports')}</Text>
+                  <Text style={styles.emptySubtext}>{t('home.checkBackLater')}</Text>
                 </View>
               )}
             </View>
@@ -267,7 +275,7 @@ export default function Home() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitle}>
-                <Text style={styles.sectionTitleText}>Community Impact</Text>
+                <Text style={styles.sectionTitleText}>{t('home.communityImpact')}</Text>
               </View>
             </View>
 
@@ -278,7 +286,7 @@ export default function Home() {
                 ) : (
                   <Text style={styles.statNumber}>{(communityStats.reportsSubmitted || 0).toLocaleString()}</Text>
                 )}
-                <Text style={styles.statLabel}>Reports Submitted</Text>
+                <Text style={styles.statLabel}>{t('home.reportsSubmitted')}</Text>
               </View>
               <View style={styles.statCard}>
                 {statsLoading ? (
@@ -286,7 +294,7 @@ export default function Home() {
                 ) : (
                   <Text style={styles.statNumber}>{(communityStats.issuesResolved || 0).toLocaleString()}</Text>
                 )}
-                <Text style={styles.statLabel}>Issues Resolved</Text>
+                <Text style={styles.statLabel}>{t('home.issuesResolved')}</Text>
               </View>
               <View style={styles.statCard}>
                 {statsLoading ? (
@@ -294,7 +302,7 @@ export default function Home() {
                 ) : (
                   <Text style={styles.statNumber}>{communityStats.resolutionRate || '0%'}</Text>
                 )}
-                <Text style={styles.statLabel}>Resolution Rate</Text>
+                <Text style={styles.statLabel}>{t('home.resolutionRate')}</Text>
               </View>
               <View style={styles.statCard}>
                 {statsLoading ? (
@@ -302,7 +310,7 @@ export default function Home() {
                 ) : (
                   <Text style={styles.statNumber}>{communityStats.avgResponseTime || '0.0'}</Text>
                 )}
-                <Text style={styles.statLabel}>Avg. Response Time</Text>
+                <Text style={styles.statLabel}>{t('home.avgResponseTime')}</Text>
               </View>
             </View>
           </View>
@@ -317,6 +325,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
     marginBottom: 50,
+  },
+  languageSwitcherContainer: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 1000,
   },
   scrollView: {
     flex: 1,

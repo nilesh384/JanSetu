@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 interface FAQ {
   id: string;
@@ -22,35 +23,36 @@ interface FAQ {
 }
 
 export default function HelpSupport() {
+  const { t } = useTranslation();
   const [faqs, setFaqs] = useState<FAQ[]>([
     {
       id: '1',
-      question: 'How do I report a civic issue?',
-      answer: 'Tap the "+" button on the home screen, fill in the details about the issue, add photos if available, and submit. Your report will be sent to the relevant authorities.',
+      question: t('profile.faq1Question'),
+      answer: t('profile.faq1Answer'),
       expanded: false,
     },
     {
       id: '2',
-      question: 'How can I track my complaint status?',
-      answer: 'Go to the "My Complaints" tab in the Complaints section. You can view all your submitted complaints and their current status.',
+      question: t('profile.faq2Question'),
+      answer: t('profile.faq2Answer'),
       expanded: false,
     },
     {
       id: '3',
-      question: 'What types of issues can I report?',
-      answer: 'You can report various civic issues including potholes, street light problems, garbage collection, water supply issues, and other public infrastructure problems.',
+      question: t('profile.faq3Question'),
+      answer: t('profile.faq3Answer'),
       expanded: false,
     },
     {
       id: '4',
-      question: 'How do I update my profile information?',
-      answer: 'Go to Profile > Settings > Personal Information to update your details, or tap on your profile picture to change it.',
+      question: t('profile.faq4Question'),
+      answer: t('profile.faq4Answer'),
       expanded: false,
     },
     {
       id: '5',
-      question: 'Is my data secure?',
-      answer: 'Yes, we use industry-standard encryption and security measures to protect your personal information and complaint data.',
+      question: t('profile.faq5Question'),
+      answer: t('profile.faq5Answer'),
       expanded: false,
     },
   ]);
@@ -72,13 +74,13 @@ export default function HelpSupport() {
 
   const handleContactSubmit = () => {
     if (!contactForm.subject.trim() || !contactForm.message.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert(t('profile.error'), t('profile.fillAllFields'));
       return;
     }
 
     Alert.alert(
-      'Message Sent',
-      'Thank you for contacting us. We will respond to your message within 24 hours.',
+      t('profile.messageSent'),
+      t('profile.messageSentDescription'),
       [
         {
           text: 'OK',
@@ -103,34 +105,34 @@ export default function HelpSupport() {
   const quickActions = [
     {
       id: 'call',
-      title: 'Call Support',
+      title: t('profile.callSupport'),
       subtitle: '',
       icon: 'call',
       action: handleCallSupport,
     },
     {
       id: 'email',
-      title: 'Email Support',
+      title: t('profile.emailSupport'),
       subtitle: '',
       icon: 'mail',
       action: handleEmailSupport,
     },
     {
       id: 'chat',
-      title: 'Chat',
+      title: t('profile.chat'),
       subtitle: '',
       icon: 'chatbubble',
-      action: () => Alert.alert('Coming Soon', 'Live chat will be available soon!'),
+      action: () => Alert.alert(t('profile.comingSoon'), t('profile.liveChatComingSoon')),
     },
   ];
 
   return (
     <SafeAreaView style={styles.container}>
-      <UniversalHeader title="Help & Support" showBackButton={true} />
+      <UniversalHeader title={t('profile.helpSupport')} showBackButton={true} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.description}>
-          Find answers to common questions or get in touch with our support team
+          {t('profile.helpDescription')}
         </Text>
 
         <View style={styles.quickActions}>
@@ -149,7 +151,7 @@ export default function HelpSupport() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
+          <Text style={styles.sectionTitle}>{t('profile.frequentlyAskedQuestions')}</Text>
 
           {faqs.map((faq) => (
             <View key={faq.id} style={styles.faqItem}>
@@ -176,28 +178,28 @@ export default function HelpSupport() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Us</Text>
+          <Text style={styles.sectionTitle}>{t('profile.contactUs')}</Text>
           <Text style={styles.contactDescription}>
-            Can't find what you're looking for? Send us a message and we'll get back to you.
+            {t('profile.contactDescription')}
           </Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Subject</Text>
+            <Text style={styles.inputLabel}>{t('profile.subject')}</Text>
             <TextInput
               style={styles.input}
               value={contactForm.subject}
               onChangeText={(value) => setContactForm(prev => ({ ...prev, subject: value }))}
-              placeholder="What can we help you with?"
+              placeholder={t('profile.subjectPlaceholder')}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Message</Text>
+            <Text style={styles.inputLabel}>{t('profile.message')}</Text>
             <TextInput
               style={[styles.input, styles.textArea]}
               value={contactForm.message}
               onChangeText={(value) => setContactForm(prev => ({ ...prev, message: value }))}
-              placeholder="Describe your issue or question..."
+              placeholder={t('profile.messagePlaceholder')}
               multiline
               numberOfLines={4}
               textAlignVertical="top"
@@ -209,7 +211,7 @@ export default function HelpSupport() {
             onPress={handleContactSubmit}
             activeOpacity={0.8}
           >
-            <Text style={styles.submitButtonText}>Send Message</Text>
+            <Text style={styles.submitButtonText}>{t('profile.sendMessage')}</Text>
           </TouchableOpacity>
         </View>
 

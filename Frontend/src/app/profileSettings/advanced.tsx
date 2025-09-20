@@ -15,6 +15,7 @@ import {
 import { useAuth } from '@/src/context/AuthContext';
 import { deleteUser } from '@/src/api/user';
 import UniversalHeader from '@/src/components/UniversalHeader';
+import { useTranslation } from 'react-i18next';
 
 interface AdvancedSetting {
   id: string;
@@ -27,6 +28,7 @@ interface AdvancedSetting {
 export default function Advanced() {
 
   const { user, logout } = useAuth();
+  const { t } = useTranslation();
 
   const [settings, setSettings] = useState<AdvancedSetting[]>([
     {
@@ -67,13 +69,13 @@ export default function Advanced() {
 
   const handleClearCache = () => {
     Alert.alert(
-      'Clear Cache',
-      'This will clear all cached data. You may need to reload some content.',
+      t('profile.clearCache'),
+      t('profile.clearCacheMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.cancel'), style: 'cancel' },
         {
-          text: 'Clear',
-          onPress: () => Alert.alert('Success', 'Cache cleared successfully!')
+          text: t('profile.clearCache'),
+          onPress: () => Alert.alert(t('profile.success'), t('profile.cacheCleared'))
         },
       ]
     );
@@ -81,16 +83,16 @@ export default function Advanced() {
 
   const handleResetSettings = () => {
     Alert.alert(
-      'Reset Settings',
-      'This will reset all settings to their default values. This action cannot be undone.',
+      t('profile.resetSettings'),
+      t('profile.resetSettingsMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('profile.resetSettings'),
           style: 'destructive',
           onPress: () => {
             setSettings(prev => prev.map(setting => ({ ...setting, enabled: false })));
-            Alert.alert('Success', 'Settings reset to defaults!');
+            Alert.alert(t('profile.success'), t('profile.settingsReset'));
           }
         },
       ]
@@ -99,13 +101,13 @@ export default function Advanced() {
 
   const handleExportLogs = () => {
     Alert.alert(
-      'Export Logs',
-      'Debug logs will be exported and sent to your email for analysis.',
+      t('profile.exportLogs'),
+      t('profile.exportLogsMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.cancel'), style: 'cancel' },
         {
-          text: 'Export',
-          onPress: () => Alert.alert('Success', 'Logs exported successfully!')
+          text: t('profile.exportLogs'),
+          onPress: () => Alert.alert(t('profile.success'), t('profile.logsExported'))
         },
       ]
     );
@@ -113,32 +115,32 @@ export default function Advanced() {
 
   const handleDeleteAccount = () => {
     Alert.alert(
-      'Delete Account',
-      'Are you absolutely sure you want to delete your account? This action cannot be undone and all your data will be permanently lost.',
+      t('profile.deleteAccount'),
+      t('profile.deleteAccountConfirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('profile.cancel'), style: 'cancel' },
         {
-          text: 'Delete Account',
+          text: t('profile.deleteAccount'),
           style: 'destructive',
           onPress: () => {
             // Call API to delete account using phoneNumber
             if (!user?.phoneNumber) {
-              Alert.alert('Error', 'Phone number not found. Please log in again.');
+              Alert.alert(t('profile.error'), t('profile.phoneNotFound'));
               return;
             }
-            
+
             deleteUser(user.phoneNumber).then((result) => {
               if (result.success) {
                 // First logout the user to clear local data
                 logout();
-                Alert.alert('Account Deleted', 'Your account has been deleted successfully.');
+                Alert.alert(t('profile.accountDeleted'), t('profile.accountDeletedMessage'));
                 router.replace('/auth/phone' as any);
               } else {
-                Alert.alert('Error', result.message || 'Failed to delete account. Please try again later.');
+                Alert.alert(t('profile.error'), result.message || t('profile.deleteAccountFailed'));
               }
             }).catch((error) => {
               console.error('Delete account error:', error);
-              Alert.alert('Error', 'Failed to delete account. Please try again later.');
+              Alert.alert(t('profile.error'), t('profile.deleteAccountFailed'));
             });
           }
         },
@@ -180,7 +182,7 @@ export default function Advanced() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <UniversalHeader title="Advanced Settings" />
+      <UniversalHeader title={t('profile.advancedSettings')} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* <View style={styles.warningSection}>
@@ -234,9 +236,9 @@ export default function Advanced() {
         </View> */}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Management</Text>
+          <Text style={styles.sectionTitle}>{t('profile.accountManagement')}</Text>
           <Text style={styles.dangerDescription}>
-            These actions are irreversible. Please proceed with caution.
+            {t('profile.irreversibleActions')}
           </Text>
 
           <TouchableOpacity
@@ -246,8 +248,8 @@ export default function Advanced() {
           >
             <Ionicons name="person-remove" size={20} color="#F44336" />
             <View style={styles.dangerText}>
-              <Text style={styles.dangerTitle}>Delete Account</Text>
-              <Text style={styles.dangerSubtitle}>Permanently delete your account and all data</Text>
+              <Text style={styles.dangerTitle}>{t('profile.deleteAccount')}</Text>
+              <Text style={styles.dangerSubtitle}>{t('profile.permanentlyDelete')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color="#F44336" />
           </TouchableOpacity>

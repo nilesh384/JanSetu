@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import UniversalHeader from '@/src/components/UniversalHeader';
+import { useTranslation } from 'react-i18next';
 
 interface Report {
   id: string;
@@ -30,6 +31,7 @@ interface Report {
 export default function IssueTracker() {
 
   const router = useRouter();
+  const { t } = useTranslation();
 
   const handleNavigateToMyComplaints = () => {
     router.push('/complaints/my' as any);
@@ -58,10 +60,10 @@ export default function IssueTracker() {
               </View>
             </View>
             
-            <Text style={styles.cardTitle}>My Complaints</Text>
+            <Text style={styles.cardTitle}>{t('complaints.myComplaints')}</Text>
             
             <View style={styles.cardFooter}>
-              <Text style={styles.cardAction}>View Details</Text>
+              <Text style={styles.cardAction}>{t('complaints.viewDetails')}</Text>
               <Ionicons name="chevron-forward" size={20} color="#FF6B35" />
             </View>
           </TouchableOpacity>
@@ -78,10 +80,10 @@ export default function IssueTracker() {
               
             </View>
             
-            <Text style={styles.cardTitle}>All Nearby Complaints</Text>
+            <Text style={styles.cardTitle}>{t('complaints.allNearbyComplaints')}</Text>
            
            <View style={styles.cardFooter}>
-              <Text style={styles.cardAction}>Explore</Text>
+              <Text style={styles.cardAction}>{t('complaints.explore')}</Text>
               <Ionicons name="chevron-forward" size={20} color="#4CAF50" />
             </View>
           </TouchableOpacity>
@@ -94,7 +96,7 @@ export default function IssueTracker() {
             onPress={() => router.push('/(tabs)/Post' as any)}
           >
             <MaterialIcons name="report-problem" size={24} color="#FFFFFF" />
-            <Text style={styles.quickActionText}>Report New Issue</Text>
+            <Text style={styles.quickActionText}>{t('complaints.reportNewIssue')}</Text>
           </TouchableOpacity>
         </View>
 

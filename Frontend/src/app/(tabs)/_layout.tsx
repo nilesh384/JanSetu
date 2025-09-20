@@ -1,50 +1,69 @@
 import { AntDesign, Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
 import { Platform, View } from "react-native";
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../context/AuthContext';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
 
 export default function RootLayout() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      // Redirect to phone login if not authenticated
+      router.replace('/auth/phone' as any);
+    }
+  }, [isAuthenticated, isLoading]);
+
+  // Don't render tabs if not authenticated or still loading
+  if (!isAuthenticated || isLoading) {
+    return null;
+  }
+
   return (
-    <Tabs
-      initialRouteName="Home"
-      screenOptions={{
-        tabBarActiveTintColor: "#FF6B35", // Saffron orange
-        tabBarInactiveTintColor: "#666666",
-        tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: "700",
-          marginTop: 2,
-          marginBottom: Platform.OS === "ios" ? 0 : 4,
-          fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
-        },
-        tabBarItemStyle: {
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 0 : 4,
-        },
-        tabBarStyle: {
-          height: Platform.OS === "ios" ? 88 : 72,
-          paddingTop: 8,
-          paddingBottom: Platform.OS === "ios" ? 34 : 8,
-          backgroundColor: "#FFFFFF",
-          borderTopWidth: 2,
-          borderTopColor: "#FF9933", // Indian flag saffron
-          elevation: 25,
-          shadowColor: "#FF6B35",
-          shadowOffset: { width: 0, height: -6 },
-          shadowOpacity: 0.15,
-          shadowRadius: 20,
-          position: "absolute",
-        },
-        tabBarBackground: () => (
-          <View style={{
-            flex: 1,
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <Tabs
+        initialRouteName="Home"
+        screenOptions={{
+          tabBarActiveTintColor: "#FF6B35", // Saffron orange
+          tabBarInactiveTintColor: "#666666",
+          tabBarLabelStyle: {
+            fontSize: 10,
+            fontWeight: "700",
+            marginTop: 2,
+            marginBottom: Platform.OS === "ios" ? 0 : 4,
+            fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
+          },
+          tabBarItemStyle: {
+            paddingTop: 8,
+            paddingBottom: Platform.OS === "ios" ? 0 : 4,
+          },
+          tabBarStyle: {
+            height: Platform.OS === "ios" ? 88 : 72,
+            paddingTop: 8,
+            paddingBottom: Platform.OS === "ios" ? 34 : 8,
             backgroundColor: "#FFFFFF",
             borderTopWidth: 2,
-            borderTopColor: "#FF9933",
-            
-          }} />
-        ),
-      }}
-    >
+            borderTopColor: "#FF9933", // Indian flag saffron
+            elevation: 25,
+            shadowColor: "#FF6B35",
+            shadowOffset: { width: 0, height: -6 },
+            shadowOpacity: 0.15,
+            shadowRadius: 20,
+            position: "absolute",
+          },
+          tabBarBackground: () => (
+            <View style={{
+              flex: 1,
+              backgroundColor: "#FFFFFF",
+              borderTopWidth: 2,
+              borderTopColor: "#FF9933",
+              
+            }} />
+          ),
+        }}
+      >
       <Tabs.Screen
         name="Home"
         options={{
@@ -183,5 +202,6 @@ export default function RootLayout() {
       />
       {/* <Stack.Screen name="modal" options={{ presentation: "modal" }} /> */}
     </Tabs>
+    </SafeAreaView>
   )
 }

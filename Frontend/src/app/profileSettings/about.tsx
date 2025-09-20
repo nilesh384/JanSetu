@@ -11,8 +11,10 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 
 export default function About() {
+  const { t } = useTranslation();
   const handleLinkPress = (url: string) => {
     Linking.openURL(url);
   };
@@ -26,29 +28,29 @@ export default function About() {
   const links = [
     {
       id: 'website',
-      title: 'Visit Our Website',
-      subtitle: 'Learn more about our mission',
+      title: t('profile.visitWebsite'),
+      subtitle: t('profile.learnMoreMission'),
       icon: 'globe',
       url: 'https://civicreporter.com', // Replace with actual website
     },
     {
       id: 'privacy',
-      title: 'Privacy Policy',
-      subtitle: 'How we protect your data',
+      title: t('profile.privacyPolicy'),
+      subtitle: t('profile.protectData'),
       icon: 'shield-checkmark',
       url: 'https://civicreporter.com/privacy', // Replace with actual privacy policy
     },
     {
       id: 'terms',
-      title: 'Terms of Service',
-      subtitle: 'Our terms and conditions',
+      title: t('profile.termsService'),
+      subtitle: t('profile.termsConditions'),
       icon: 'document-text',
       url: 'https://civicreporter.com/terms', // Replace with actual terms
     },
     {
       id: 'feedback',
-      title: 'Send Feedback',
-      subtitle: 'Help us improve the app',
+      title: t('profile.sendFeedback'),
+      subtitle: t('profile.helpImprove'),
       icon: 'chatbubble',
       url: 'mailto:feedback@civicreporter.com', // Replace with actual feedback email
     },
@@ -57,12 +59,12 @@ export default function About() {
   const team = [
     {
       name: 'Nilesh Bera',
-      role: 'Project Lead | Planner',
-      department: 'App Developer',
+      role: t('profile.projectLead'),
+      department: t('profile.appDeveloper'),
     },
     {
       name: 'Priya Singh',
-      role: 'Planner',
+      role: t('profile.planner'),
       department: '',
     },
     // {
@@ -74,40 +76,38 @@ export default function About() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <UniversalHeader title="About" />
+      <UniversalHeader title={t('profile.about')} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Our Mission</Text>
+          <Text style={styles.sectionTitle}>{t('profile.ourMission')}</Text>
           <Text style={styles.missionText}>
-            Civic Reporter is a crowdsourced platform that connects citizens with local governments
-            to address civic issues efficiently. We believe in transparent governance and community
-            participation to create better living environments for everyone.
+            {t('profile.missionText')}
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Information</Text>
+          <Text style={styles.sectionTitle}>{t('profile.appInformation')}</Text>
 
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Version</Text>
+            <Text style={styles.infoLabel}>{t('profile.versionLabel')}</Text>
             <Text style={styles.infoValue}>{appInfo.version}</Text>
           </View>
 
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Build</Text>
+            <Text style={styles.infoLabel}>{t('profile.buildLabel')}</Text>
             <Text style={styles.infoValue}>{appInfo.build}</Text>
           </View>
 
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Last Updated</Text>
+            <Text style={styles.infoLabel}>{t('profile.lastUpdatedLabel')}</Text>
             <Text style={styles.infoValue}>{appInfo.lastUpdated}</Text>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Links</Text>
+          <Text style={styles.sectionTitle}>{t('profile.quickLinks')}</Text>
 
           {links.map((link) => (
             <TouchableOpacity
@@ -129,9 +129,9 @@ export default function About() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Our Team</Text>
+          <Text style={styles.sectionTitle}>{t('profile.ourTeam')}</Text>
           <Text style={styles.teamDescription}>
-            Meet the dedicated team behind Civic Reporter
+            {t('profile.meetTeam')}
           </Text>
 
           {team.map((member, index) => (
@@ -151,7 +151,7 @@ export default function About() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <Text style={styles.sectionTitle}>{t('profile.contactInformation')}</Text>
 
           <TouchableOpacity
             style={styles.contactItem}
@@ -179,10 +179,10 @@ export default function About() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            © 2024 Civic Reporter. All rights reserved.
+            {t('profile.copyrightText')}
           </Text>
           <Text style={styles.footerSubtext}>
-            Made with ❤️ for better communities
+            {t('profile.madeWithLove')}
           </Text>
         </View>
       </ScrollView>

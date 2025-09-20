@@ -1,12 +1,31 @@
 import { Stack } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '../../context/AuthContext';
+import { useEffect } from 'react';
+import { router } from 'expo-router';
 
 export default function ProfileSettingsLayout() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      // Redirect to phone login if not authenticated
+      router.replace('/auth/phone' as any);
+    }
+  }, [isAuthenticated, isLoading]);
+
+  // Don't render if not authenticated or still loading
+  if (!isAuthenticated || isLoading) {
+    return null;
+  }
+
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false, // Disable default headers for all profile settings screens
-      }}
-    >
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+      <Stack
+        screenOptions={{
+          headerShown: false, // Disable default headers for all profile settings screens
+        }}
+      >
       <Stack.Screen 
         name="about" 
         options={{ 
@@ -50,5 +69,6 @@ export default function ProfileSettingsLayout() {
         }} 
       />
     </Stack>
+    </SafeAreaView>
   );
 }

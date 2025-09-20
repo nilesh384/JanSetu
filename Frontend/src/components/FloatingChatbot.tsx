@@ -13,6 +13,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { sendMessage, getMessages, deleteMessages } from '../api/chat';
 import { useAuth } from '../context/AuthContext';
 
@@ -205,6 +206,7 @@ interface Message {
 
 const FloatingChatbot: React.FC = () => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -328,7 +330,7 @@ const FloatingChatbot: React.FC = () => {
       <TouchableOpacity
         style={{
           position: 'absolute',
-          bottom: Platform.OS === 'ios' ? 100 : 84, // Above tab bar (88+12 for iOS, 72+12 for Android)
+          bottom: (Platform.OS === 'ios' ? 100 : 84) + insets.bottom, // Above tab bar + safe area
           right: 20,
           width: 45,
           height: 45,
@@ -376,7 +378,7 @@ const FloatingChatbot: React.FC = () => {
               backgroundColor: '#111827',
               borderTopLeftRadius: 20,
               borderTopRightRadius: 20,
-              height: height * 0.7,
+              height: height * 1.02 + insets.bottom,
               padding: 20,
               borderWidth: 1,
               borderColor: '#374151',

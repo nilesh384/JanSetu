@@ -1,6 +1,6 @@
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, Fragment } from 'react';
 import {
     Animated,
     Dimensions,
@@ -11,6 +11,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import WebViewModal from './WebViewModal';
 
 const { width } = Dimensions.get('window');
@@ -20,6 +21,7 @@ interface HomeHeaderProps{
 }
 
 const HomeHeader: React.FC<HomeHeaderProps> = () => {
+  const { t } = useTranslation();
   const [currentTipIndex, setCurrentTipIndex] = useState(0);
   const [webViewVisible, setWebViewVisible] = useState(false);
   const [webViewUrl, setWebViewUrl] = useState('');
@@ -30,8 +32,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
   const citizenTips = [
     {
       id: 1,
-      title: "🚨 Emergency Report",
-      message: "Report critical issues like accidents, fires, or medical emergencies immediately",
+      title: t('home.emergencyReport'),
+      message: t('home.emergencyMessage'),
       icon: "alert-circle",
       color: "#DC2626",
       action: "emergency",
@@ -39,8 +41,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
     },
     {
       id: 2,
-      title: "🛣️ Road & Infrastructure",
-      message: "Report potholes, broken streetlights, damaged roads, and infrastructure issues",
+      title: t('home.roadInfrastructure'),
+      message: t('home.roadMessage'),
       icon: "construct",
       color: "#FF6B35",
       action: "infrastructure",
@@ -48,8 +50,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
     },
     {
       id: 3,
-      title: "🗑️ Sanitation & Waste",
-      message: "Report overflowing garbage bins, illegal dumping, and sanitation problems",
+      title: t('home.sanitationWaste'),
+      message: t('home.sanitationMessage'),
       icon: "trash",
       color: "#059669",
       action: "sanitation",
@@ -57,8 +59,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
     },
     {
       id: 4,
-      title: "💧 Water & Utilities",
-      message: "Report water supply issues, pipe leaks, and utility service problems",
+      title: t('home.waterUtilities'),
+      message: t('home.waterMessage'),
       icon: "water",
       color: "#2563EB",
       action: "utilities",
@@ -66,8 +68,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
     },
     {
       id: 5,
-      title: "🏥 Health & Safety",
-      message: "Report health hazards, unsafe conditions, and public safety concerns",
+      title: t('home.healthSafety'),
+      message: t('home.healthMessage'),
       icon: "medical",
       color: "#7C3AED",
       action: "health",
@@ -75,8 +77,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
     },
     {
       id: 6,
-      title: "📊 Track Your Reports",
-      message: "Monitor the status of your submitted reports and get resolution updates",
+      title: t('home.trackReports'),
+      message: t('home.trackMessage'),
       icon: "analytics",
       color: "#EA580C",
       action: "track",
@@ -161,8 +163,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
             <View style={styles.greetingContainer}>
                               <Image source={require('../assets/images/bgImg.png')} style={styles.icon} />
               <View style={styles.greetingText}>
-                <Text style={styles.greetingLabel}>Welcome to</Text>
-                <Text style={styles.userName}>JanSetu</Text>
+                <Text style={styles.greetingLabel}>{t('home.welcomeTo')}</Text>
+                <Text style={styles.userName}>{t('home.appName')}</Text>
               </View>
             </View>
           </View>
@@ -210,7 +212,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
                   style={styles.learnMoreButton}
                   onPress={() => handleLinkPress(currentTip.link)}
                 >
-                  <Text style={styles.learnMoreText}>Learn More</Text>
+                  <Text style={styles.learnMoreText}>{t('home.learnMore')}</Text>
                   <AntDesign name="arrow-right" size={14} color={currentTip.color} />
                 </TouchableOpacity>
               </View>
@@ -223,21 +225,21 @@ const HomeHeader: React.FC<HomeHeaderProps> = () => {
               <View style={[styles.quickActionIcon, { backgroundColor: '#FEF2F2' }]}>
                 <Ionicons name="flag" size={20} color="#DC2626" />
               </View>
-              <Text style={styles.quickActionText}>Quick Report</Text>
+              <Text style={styles.quickActionText}>{t('home.quickReport')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickAction} onPress={() => {router.push('/complaints/nearby' as any)}}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#F0F9FF' }]}>
                 <Ionicons name="location" size={20} color="#2563EB" />
               </View>
-              <Text style={styles.quickActionText}>Nearby Issues</Text>
+              <Text style={styles.quickActionText}>{t('home.nearbyIssues')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/complaints/my' as any)}>
               <View style={[styles.quickActionIcon, { backgroundColor: '#F0FDF4' }]}>
                 <Ionicons name="stats-chart" size={20} color="#059669" />
               </View>
-              <Text style={styles.quickActionText}>My Reports</Text>
+              <Text style={styles.quickActionText}>{t('home.myReports')}</Text>
             </TouchableOpacity>
           </View>
         </View>
