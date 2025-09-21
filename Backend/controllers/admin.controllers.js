@@ -1,9 +1,198 @@
 import { query, queryOne, transaction } from "../db/utils.js";
+import emailService from "../services/emailService.js";
 
 // Helper to convert DB timestamp values to ISO strings (null-safe)
 const toISO = (val) => (val ? new Date(val).toISOString() : null);
 
-// Admin login - check if email exists in admins table
+// Store OTPs temporarily (in production, use Redis or database)
+const otpStore = new Map();
+
+// Admin email verification - sends OTP to admin email
+const sendAdminOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required"
+            });
+        }
+
+        console.log('🔍 Sending OTP for admin email:', email);
+
+        // Check if admin exists with the provided email
+        const checkAdminQuery = `
+            SELECT id, email, full_name, is_active
+            FROM admins
+            WHERE email = $1 AND is_active = true
+        `;
+
+        const adminResult = await queryOne(checkAdminQuery, [email.toLowerCase()]);
+
+        if (!adminResult) {
+            return res.status(401).json({
+                success: false,
+                message: "Admin not found or inactive"
+            });
+        }
+
+        // Generate OTP
+        const otp = emailService.generateOTP();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+        // Store OTP with expiry
+        otpStore.set(email.toLowerCase(), {
+            otp,
+            expiry: otpExpiry,
+            adminId: adminResult.id,
+            attempts: 0
+        });
+
+        // Send OTP email
+        const emailResult = await emailService.sendAdminOTP(email, otp);
+
+        if (!emailResult.success) {
+            return res.status(500).json({
+                success: false,
+                message: "Failed to send OTP email"
+            });
+        }
+
+        console.log('✅ OTP sent successfully to admin:', email);
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP sent to your email address",
+            data: {
+                email: email.toLowerCase(),
+                expiresIn: 600 // 10 minutes in seconds
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Error sending admin OTP:', error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+};
+
+// Verify OTP and complete admin login
+const verifyAdminOTP = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+
+        if (!email || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and OTP are required"
+            });
+        }
+
+        console.log('🔍 Verifying OTP for admin email:', email);
+
+        const emailKey = email.toLowerCase();
+        const storedOTPData = otpStore.get(emailKey);
+
+        if (!storedOTPData) {
+            return res.status(400).json({
+                success: false,
+                message: "OTP not found or expired. Please request a new one."
+            });
+        }
+
+        // Check if OTP is expired
+        if (new Date() > storedOTPData.expiry) {
+            otpStore.delete(emailKey);
+            return res.status(400).json({
+                success: false,
+                message: "OTP has expired. Please request a new one."
+            });
+        }
+
+        // Check attempt limit
+        if (storedOTPData.attempts >= 3) {
+            otpStore.delete(emailKey);
+            return res.status(400).json({
+                success: false,
+                message: "Too many failed attempts. Please request a new OTP."
+            });
+        }
+
+        // Verify OTP
+        if (storedOTPData.otp !== otp) {
+            storedOTPData.attempts += 1;
+            otpStore.set(emailKey, storedOTPData);
+            
+            return res.status(400).json({
+                success: false,
+                message: `Invalid OTP. ${3 - storedOTPData.attempts} attempts remaining.`
+            });
+        }
+
+        // OTP verified successfully, get admin data and clear OTP
+        otpStore.delete(emailKey);
+
+        const admin = await transaction(async (client) => {
+            // Get admin data
+            const getAdminQuery = `
+                SELECT id, email, full_name, department, role, is_active, last_login, created_at
+                FROM admins
+                WHERE id = $1 AND is_active = true
+            `;
+
+            const adminResult = await client.query(getAdminQuery, [storedOTPData.adminId]);
+
+            if (adminResult.rows.length === 0) {
+                throw new Error('Admin not found or inactive');
+            }
+
+            const adminData = adminResult.rows[0];
+
+            // Update last_login timestamp
+            const updateLoginQuery = `
+                UPDATE admins
+                SET last_login = CURRENT_TIMESTAMP,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = $1
+            `;
+
+            await client.query(updateLoginQuery, [adminData.id]);
+
+            return adminData;
+        });
+
+        console.log('✅ Admin OTP verified and logged in successfully:', admin.id);
+
+        // Return admin data (excluding sensitive information)
+        const adminData = {
+            id: admin.id,
+            email: admin.email,
+            fullName: admin.full_name,
+            department: admin.department,
+            role: admin.role,
+            lastLogin: toISO(admin.last_login),
+            createdAt: toISO(admin.created_at)
+        };
+
+        return res.status(200).json({
+            success: true,
+            message: "Admin login successful",
+            data: adminData
+        });
+
+    } catch (error) {
+        console.error('❌ Error verifying admin OTP:', error);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+};
+
+// Legacy admin login (kept for backward compatibility)
 const adminLogin = async (req, res) => {
     try {
         const { email } = req.body;
@@ -302,4 +491,4 @@ const getAllAdmins = async (req, res) => {
     }
 };
 
-export { adminLogin, getAdminProfile, getAllAdmins };
+export { adminLogin, sendAdminOTP, verifyAdminOTP, getAdminProfile, getAllAdmins };

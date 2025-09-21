@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Jan Setu",
+    "name": "JanSetu",
     "slug": "JanSetu",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,7 +16,8 @@
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.nilesh.JanSetu"
     },
     "web": {
       "bundler": "metro",
@@ -37,6 +38,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "843097ae-52d5-46fd-bb90-3a2e883bef4e"
+      }
     }
   }
 }

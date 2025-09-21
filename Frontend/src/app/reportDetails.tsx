@@ -52,6 +52,7 @@ interface Report {
   resolvedByRole?: string;
   userName?: string;
   userPhone?: string;
+  userProfilePhoto?: string;
 }
 
 export default function ReportDetails() {
@@ -292,6 +293,20 @@ export default function ReportDetails() {
         <UniversalHeader title="Report Details" showBackButton={true} />
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {/* User Details Section - Moved to Top */}
+          {report.userName && (
+            <View style={styles.userDetailsSection}>
+              <View style={styles.userDetailsHeader}>
+                <Text style={styles.userDetailsTitle}>Reported By</Text>
+              </View>
+              <View style={styles.userCard}>
+                <TouchableOpacity onPress={() => router.push(`/user-details?userId=${report.userId}`)}>
+                  <Text style={[styles.userName, styles.clickableUserName]}>{report.userName}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
           {/* Header Info */}
           <View style={styles.reportHeader}>
             <View style={styles.reportInfo}>
@@ -312,27 +327,6 @@ export default function ReportDetails() {
             <Text style={styles.reportTitle}>{report.title}</Text>
             <Text style={styles.reportDescription}>{report.description}</Text>
           </View>
-
-          {/* User Information */}
-          {(report.userName || report.userPhone) && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Reported By</Text>
-              <View style={styles.userInfoContainer}>
-                {report.userName && (
-                  <View style={styles.detailRow}>
-                    <Ionicons name="person" size={20} color="#666666" />
-                    <Text style={styles.detailText}>{report.userName}</Text>
-                  </View>
-                )}
-                {report.userPhone && (
-                  <View style={styles.detailRow}>
-                    <Ionicons name="call" size={20} color="#666666" />
-                    <Text style={styles.detailText}>{report.userPhone}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          )}
 
           {/* Media Section */}
           {(report.mediaUrls.length > 0 || report.audioUrl) && (
@@ -737,6 +731,78 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 16,
+  },
+  // User Details Section Styles
+  userDetailsSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    marginTop: 12,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    alignSelf: 'center',
+    width: '100%', // Make it narrower
+  },
+  userDetailsHeader: {
+    marginBottom: 12,
+  },
+  userDetailsTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333333',
+    textAlign: 'center',
+  },
+  userCard: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  userAvatarContainer: {
+    marginRight: 16,
+  },
+  userAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  userAvatarImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0b16f1ff',
+    marginBottom: 4,
+  },
+  clickableUserName: {
+    textDecorationLine: 'underline',
+  },
+  userPhone: {
+    fontSize: 16,
+    color: '#666666',
   },
   errorContainer: {
     flex: 1,

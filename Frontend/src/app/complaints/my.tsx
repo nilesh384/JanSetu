@@ -12,6 +12,7 @@ import {
   View,
   ActivityIndicator,
   Alert,
+  Modal,
 } from 'react-native';
 import { useAuth } from '@/src/context/AuthContext';
 import { getUserReports } from '@/src/api/report';
@@ -84,6 +85,8 @@ export default function MyComplaints() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('All');
+  const [sortBy, setSortBy] = useState('');
+  const [showSortDropdown, setShowSortDropdown] = useState(false);
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,13 +132,47 @@ export default function MyComplaints() {
     { key: 'Resolved', label: 'Resolved', count: reports.filter(r => r.isResolved).length, icon: 'checkmark-circle' },
   ];
 
-  const filteredReports = reports.filter(report => {
-    const matchesSearch = report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      report.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const reportStatus = getStatusText(report.isResolved);
-    const matchesFilter = selectedFilter === 'All' || reportStatus === selectedFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const sortOptions = [
+    { key: 'date', label: 'Recent', icon: 'time' as const },
+    { key: 'priority', label: 'Priority', icon: 'flag' as const },
+    { key: 'status', label: 'Status', icon: 'checkmark-circle' as const },
+  ];
+
+  const filteredReports = reports
+    .filter(report => {
+      const matchesSearch = report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        report.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const reportStatus = getStatusText(report.isResolved);
+      const matchesFilter = selectedFilter === 'All' || reportStatus === selectedFilter;
+      return matchesSearch && matchesFilter;
+    })
+    .sort((a: Report, b: Report) => {
+      if (!sortBy) {
+        // Default sort by date when no sort is selected
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return dateB - dateA;
+      }
+      
+      switch (sortBy) {
+        case 'date': {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return dateB - dateA;
+        }
+        case 'priority': {
+          const priorityOrder = { 'critical': 4, 'high': 3, 'medium': 2, 'low': 1 };
+          return (priorityOrder[b.priority.toLowerCase() as keyof typeof priorityOrder] || 0) - 
+                 (priorityOrder[a.priority.toLowerCase() as keyof typeof priorityOrder] || 0);
+        }
+        case 'status': {
+          if (a.isResolved === b.isResolved) return 0;
+          return a.isResolved ? 1 : -1; // Unresolved first
+        }
+        default:
+          return 0;
+      }
+    });
 
   const renderReport = ({ item }: { item: Report }) => {
     const createdDate = formatDate(item.createdAt);
@@ -257,51 +294,109 @@ export default function MyComplaints() {
             />
           </View>
 
-          {/* Filters */}
-          <View style={styles.filterContainer}>
-            <Text style={styles.filterTitle}>Filter by Status</Text>
+          {/* Filters and Sort - Compact Version */}
+          <View style={styles.controlsContainer}>
+            {/* Filters */}
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              style={styles.filterScrollView}
-              contentContainerStyle={styles.filterScrollContent}
+              style={styles.compactFilterScrollView}
+              contentContainerStyle={styles.compactFilterScrollContent}
             >
               {filters.map(filter => (
                 <TouchableOpacity
                   key={filter.key}
                   style={[
-                    styles.filterTab,
-                    selectedFilter === filter.key && styles.activeFilterTab,
+                    styles.compactFilterTab,
+                    selectedFilter === filter.key && styles.activeCompactFilterTab,
                   ]}
                   onPress={() => setSelectedFilter(filter.key)}
                   activeOpacity={0.8}
                 >
-                  <View style={styles.filterTabContent}>
-                    
-                    <View style={styles.filterTextContainer}>
-                      <Text style={[
-                        styles.filterLabel,
-                        selectedFilter === filter.key && styles.activeFilterLabel,
-                      ]}>
-                        {filter.label}
-                      </Text>
-                      <View style={[
-                        styles.filterBadge,
-                        selectedFilter === filter.key && styles.activeFilterBadge,
-                      ]}>
-                        <Text style={[
-                          styles.filterCount,
-                          selectedFilter === filter.key && styles.activeFilterCount,
-                        ]}>
-                          {filter.count}
-                        </Text>
-                      </View>
-                    </View>
+                  <Text style={[
+                    styles.compactFilterLabel,
+                    selectedFilter === filter.key && styles.activeCompactFilterLabel,
+                  ]}>
+                    {filter.label}
+                  </Text>
+                  <View style={[
+                    styles.compactFilterBadge,
+                    selectedFilter === filter.key && styles.activeCompactFilterBadge,
+                  ]}>
+                    <Text style={[
+                      styles.compactFilterCount,
+                      selectedFilter === filter.key && styles.activeCompactFilterCount,
+                    ]}>
+                      {filter.count}
+                    </Text>
                   </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
+
+            {/* Sort Dropdown */}
+            <TouchableOpacity
+              style={styles.sortDropdownButton}
+              onPress={() => setShowSortDropdown(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons 
+                name={sortOptions.find(opt => opt.key === sortBy)?.icon || 'swap-vertical'} 
+                size={16} 
+                color="#666666" 
+              />
+              <Text style={styles.sortDropdownText}>
+                {sortOptions.find(opt => opt.key === sortBy)?.label || 'Sort'}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#666666" />
+            </TouchableOpacity>
           </View>
+
+          {/* Sort Dropdown Modal */}
+          <Modal
+            visible={showSortDropdown}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowSortDropdown(false)}
+          >
+            <TouchableOpacity
+              style={styles.sortModalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowSortDropdown(false)}
+            >
+              <View style={styles.sortModalContent}>
+                <Text style={styles.sortModalTitle}>Sort by</Text>
+                {sortOptions.map(option => (
+                  <TouchableOpacity
+                    key={option.key}
+                    style={[
+                      styles.sortModalOption,
+                      sortBy === option.key && styles.activeSortModalOption,
+                    ]}
+                    onPress={() => {
+                      setSortBy(option.key);
+                      setShowSortDropdown(false);
+                    }}
+                  >
+                    <Ionicons 
+                      name={option.icon} 
+                      size={18} 
+                      color={sortBy === option.key ? '#FF6B35' : '#666666'} 
+                    />
+                    <Text style={[
+                      styles.sortModalOptionText,
+                      sortBy === option.key && styles.activeSortModalOptionText,
+                    ]}>
+                      {option.label}
+                    </Text>
+                    {sortBy === option.key && (
+                      <Ionicons name="checkmark" size={18} color="#FF6B35" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {/* Reports List */}
           {loading ? (
@@ -321,24 +416,35 @@ export default function MyComplaints() {
             />
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="document-text-outline" size={64} color="#CCCCCC" />
+              <View style={styles.emptyIconContainer}>
+                <Ionicons name="document-text-outline" size={48} color="#FF6B35" />
+              </View>
               <Text style={styles.emptyTitle}>
-                {reports.length === 0 ? 'No Reports Yet' : 'No Complaints Found'}
+                {reports.length === 0 ? 'No Reports Yet' : 'No Reports Found'}
               </Text>
               <Text style={styles.emptySubtitle}>
                 {reports.length === 0
-                  ? 'Start by creating your first report'
+                  ? 'Start by creating your first report to help improve your community'
                   : searchQuery
-                    ? 'Try adjusting your search criteria'
-                    : 'You have no complaints matching this filter'
+                    ? 'Try adjusting your search criteria or filters'
+                    : 'You have no reports matching this filter'
                 }
               </Text>
-              {reports.length === 0 && (
+              {reports.length === 0 ? (
                 <TouchableOpacity
-                  style={styles.createFirstButton}
+                  style={styles.emptyActionButton}
                   onPress={() => router.push('/(tabs)/Post')}
                 >
-                  <Text style={styles.createFirstButtonText}>Create First Report</Text>
+                  <Ionicons name="add" size={16} color="#FF6B35" />
+                  <Text style={styles.emptyActionText}>Create First Report</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.emptyActionButton}
+                  onPress={() => fetchReports(true)}
+                >
+                  <Ionicons name="refresh" size={16} color="#FF6B35" />
+                  <Text style={styles.emptyActionText}>Refresh</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -369,12 +475,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
-    marginVertical: 12,
+    marginTop: 12,
+    marginBottom: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 0,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   searchInput: {
     flex: 1,
@@ -382,96 +497,146 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333333',
   },
-  filterContainer: {
+  controlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 8,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  filterTitle: {
-    fontSize: 14,
+  compactFilterScrollView: {
+    flex: 1,
+  },
+  compactFilterScrollContent: {
+    paddingRight: 8,
+  },
+  compactFilterTab: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 6,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  activeCompactFilterTab: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  compactFilterLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666666',
+  },
+  activeCompactFilterLabel: {
+    color: '#FFFFFF',
+  },
+  compactFilterBadge: {
+    backgroundColor: '#E0E0E0',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 6,
+    minWidth: 16,
+    alignItems: 'center',
+  },
+  activeCompactFilterBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  compactFilterCount: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  activeCompactFilterCount: {
+    color: '#FFFFFF',
+  },
+  sortDropdownButton: {
+    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 90,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.03,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  sortDropdownText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#666666',
+  },
+  sortModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sortModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    minWidth: 200,
+    maxWidth: 280,
+    marginHorizontal: 20,
+  },
+  sortModalTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: '#333333',
     marginBottom: 12,
-    paddingHorizontal: 4,
+    textAlign: 'center',
   },
-  filterScrollView: {
-    marginHorizontal: -4,
-  },
-  filterScrollContent: {
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-  },
-  filterTab: {
+  sortModalOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    marginRight: 8,
-    paddingHorizontal: 16,
     paddingVertical: 12,
-    minHeight: 48,
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 12,
   },
-  activeFilterTab: {
-    backgroundColor: '#FF6B35',
-    borderColor: '#FF6B35',
-    elevation: 4,
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+  activeSortModalOption: {
+    backgroundColor: '#FFF5F2',
   },
-  filterTabContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  filterIcon: {
-    marginRight: 8,
-  },
-  filterTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  filterLabel: {
+  sortModalOptionText: {
+    flex: 1,
     fontSize: 14,
     color: '#666666',
+  },
+  activeSortModalOptionText: {
+    color: '#FF6B35',
     fontWeight: '500',
-    marginRight: 8,
-  },
-  activeFilterLabel: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  filterBadge: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeFilterBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  filterCount: {
-    fontSize: 12,
-    color: '#666666',
-    fontWeight: '600',
-  },
-  activeFilterCount: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
   reportsList: {
     flex: 1,
     paddingHorizontal: 16,
+    paddingTop: 4,
   },
   reportCard: {
     backgroundColor: '#FFFFFF',
@@ -546,20 +711,47 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   emptyState: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 64,
+    paddingHorizontal: 32,
+    paddingVertical: 40,
+  },
+  emptyIconContainer: {
+    backgroundColor: '#FFF5F2',
+    borderRadius: 40,
+    padding: 24,
+    marginBottom: 16,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#999999',
-    marginTop: 16,
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#374151',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: 14,
-    color: '#CCCCCC',
+    fontSize: 15,
+    color: '#6B7280',
     textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  emptyActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF5F2',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FF6B35',
+    gap: 6,
+  },
+  emptyActionText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FF6B35',
   },
   loadingContainer: {
     flex: 1,
@@ -571,18 +763,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666666',
     marginTop: 12,
-  },
-  createFirstButton: {
-    backgroundColor: '#FF6B35',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  createFirstButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 
   // Additional styles for new card design

@@ -169,9 +169,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('❌ Non-network error or max retries reached, clearing auth data');
         setHasNetworkError(false); // Clear network error flag
         setIsLoading(false); // Clear loading state
-        await clearAuthStorage();
-        setUser(null);
-        setRequiresProfileSetup(false);
+        //FIXME:
+        // await clearAuthStorage();
+        // setUser(null);
+        // setRequiresProfileSetup(false);
       }
     }
   };  // Login function (called after successful OTP verification)

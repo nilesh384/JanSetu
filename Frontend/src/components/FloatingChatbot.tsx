@@ -11,6 +11,7 @@ import {
   Platform,
   Dimensions,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -211,6 +212,7 @@ const FloatingChatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -222,6 +224,7 @@ const FloatingChatbot: React.FC = () => {
   const loadMessages = async () => {
     if (!user?.id) return;
 
+    setIsLoadingMessages(true);
     try {
       const response = await getMessages(user.id) as any;
       if (response.success) {
@@ -229,6 +232,8 @@ const FloatingChatbot: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+    } finally {
+      setIsLoadingMessages(false);
     }
   };
 
@@ -448,7 +453,24 @@ const FloatingChatbot: React.FC = () => {
                 onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
                 onLayout={() => flatListRef.current?.scrollToEnd()}
                 ListEmptyComponent={
-                  !isLoading ? (
+                  isLoadingMessages ? (
+                    <View style={{
+                      flex: 1,
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      paddingTop: 40,
+                    }}>
+                      <ActivityIndicator size="large" color="#3B82F6" />
+                      <Text style={{
+                        color: '#6B7280',
+                        textAlign: 'center',
+                        marginTop: 16,
+                        fontSize: 16,
+                      }}>
+                        Loading messages...
+                      </Text>
+                    </View>
+                  ) : (
                     <Text style={{
                       color: '#6B7280',
                       textAlign: 'center',
@@ -457,7 +479,7 @@ const FloatingChatbot: React.FC = () => {
                     }}>
                       No messages yet. Start chatting!
                     </Text>
-                  ) : null
+                  )
                 }
               />
 
