@@ -945,6 +945,7 @@ const deleteReport = async (req, res) => {
 const getNearbyReports = async (req, res) => {
     try {
         const { latitude, longitude, radius = 10, limit = 20, offset = 0 } = req.query;
+        const currentUserId = req.userId;
 
         if (!latitude || !longitude) {
             return res.status(400).json({
@@ -968,11 +969,12 @@ const getNearbyReports = async (req, res) => {
             LEFT JOIN admins ON r.resolved_by_admin_id = admins.id
             WHERE r.latitude IS NOT NULL 
                 AND r.longitude IS NOT NULL
+                AND r.user_id != $6
                 AND (6371 * acos(cos(radians($1)) * cos(radians(r.latitude)) * 
                      cos(radians(r.longitude) - radians($2)) + 
                      sin(radians($1)) * sin(radians(r.latitude)))) <= $3
             ORDER BY distance ASC, r.created_at DESC
-            LIMIT $4 OFFSET $5
+            LIMIT $4 OFFSET $5 
         `;
 
         const result = await query(nearbyQuery, [
@@ -980,7 +982,8 @@ const getNearbyReports = async (req, res) => {
             parseFloat(longitude),
             parseFloat(radius),
             parseInt(limit),
-            parseInt(offset)
+            parseInt(offset),
+            currentUserId
         ]);
 
         // Map reports to camelCase

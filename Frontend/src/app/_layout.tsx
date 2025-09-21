@@ -30,6 +30,7 @@ function RootLayoutContent() {
           <Stack.Screen name="complaints" options={{ headerShown: false }} />
           <Stack.Screen name="profileSettings" options={{ headerShown: false }} />
           <Stack.Screen name="reportDetails" options={{ headerShown: false }} />
+          <Stack.Screen name="user-details" options={{ headerShown: false }} />
         </Stack>
       </AuthWrapper>
       {shouldShowChatbot && <FloatingChatbot />}
