@@ -1,5 +1,6 @@
 import { query, queryOne, transaction } from "../db/utils.js";
 import { uploadOnCloudinary } from "../services/cloudinary.js";
+import redisService from "../services/redis.js";
 
 // Helper to convert DB timestamp values to ISO strings (null-safe)
 const toISO = (val) => (val ? new Date(val).toISOString() : null);
@@ -187,6 +188,36 @@ const createReport = async (req, res) => {
 
         console.log('✅ Report created successfully:', newReport.id);
 
+        // Invalidate relevant caches after creating a new report
+        try {
+            // Invalidate admin report caches since a new report was added
+            await redisService.invalidateAdminReports();
+            
+            // Invalidate user reports cache for this user
+            const userCachePattern = `reports:user_reports:${actualUserId}:*`;
+            const userKeys = await redisService.scanKeys(userCachePattern);
+            if (userKeys.length > 0) {
+                await redisService.del(userKeys);
+                console.log(`🗑️ Invalidated ${userKeys.length} user report cache entries`);
+            }
+            
+            // If location is provided, invalidate nearby reports cache
+            if (newReport.latitude && newReport.longitude) {
+                // Invalidate nearby reports (use a broader pattern to catch location-based caches)
+                const nearbyPattern = `reports:nearby_reports:*:*:*:*:*:${actualUserId}`;
+                const nearbyKeys = await redisService.scanKeys(nearbyPattern);
+                if (nearbyKeys.length > 0) {
+                    await redisService.del(nearbyKeys);
+                    console.log(`🗑️ Invalidated ${nearbyKeys.length} nearby report cache entries`);
+                }
+            }
+            
+            console.log('🧹 Cache invalidation completed for new report');
+        } catch (cacheError) {
+            console.warn('⚠️ Cache invalidation failed:', cacheError.message);
+            // Don't fail the request if cache invalidation fails
+        }
+
         // Map database fields to camelCase
         const mappedReport = {
             id: newReport.id,
@@ -248,6 +279,21 @@ const getUserReports = async (req, res) => {
         }
 
         console.log('🔍 Fetching reports for user:', userId);
+
+        // Create cache key based on all parameters
+        const cacheKey = `user_reports:${userId}:${isResolved || 'all'}:${category || 'all'}:${priority || 'all'}:${limit}:${offset}`;
+        
+        // Try to get from Redis cache first
+        const cachedReports = await redisService.getCachedReports(cacheKey);
+        if (cachedReports) {
+            console.log('📦 Returning cached user reports');
+            return res.status(200).json({
+                success: true,
+                reports: cachedReports.reports,
+                pagination: cachedReports.pagination,
+                cached: true
+            });
+        }
 
         // Build dynamic query based on filters
         let baseQuery = `
@@ -312,14 +358,21 @@ const getUserReports = async (req, res) => {
 
         console.log(`✅ Found ${mappedReports.length} reports for user`);
 
-        res.status(200).json({
-            success: true,
+        const responseData = {
             reports: mappedReports,
             pagination: {
                 limit: parseInt(limit),
                 offset: parseInt(offset),
                 total: mappedReports.length
             }
+        };
+
+        // Cache the results for 5 minutes
+        await redisService.cacheReports(cacheKey, responseData, 300);
+
+        res.status(200).json({
+            success: true,
+            ...responseData
         });
 
     } catch (error) {
@@ -577,6 +630,13 @@ const updateReport = async (req, res) => {
 
         console.log('✅ Report updated successfully:', reportId);
 
+        // Invalidate admin report caches since report was updated
+        try {
+            await redisService.invalidateAdminReports();
+        } catch (cacheError) {
+            console.warn('⚠️ Failed to invalidate admin report caches:', cacheError.message);
+        }
+
         res.status(200).json({
             success: true,
             message: 'Report updated successfully',
@@ -811,6 +871,13 @@ const resolveReport = async (req, res) => {
 
         console.log('✅ Report resolved successfully by admin:', adminId);
 
+        // Invalidate admin report caches since report status changed
+        try {
+            await redisService.invalidateAdminReports();
+        } catch (cacheError) {
+            console.warn('⚠️ Failed to invalidate admin report caches:', cacheError.message);
+        }
+
         res.status(200).json({
             success: true,
             message: 'Report marked as resolved',
@@ -910,6 +977,13 @@ const deleteReport = async (req, res) => {
 
         console.log('✅ Report deleted successfully:', reportId);
 
+        // Invalidate admin report caches since report was deleted
+        try {
+            await redisService.invalidateAdminReports();
+        } catch (cacheError) {
+            console.warn('⚠️ Failed to invalidate admin report caches:', cacheError.message);
+        }
+
         res.status(200).json({
             success: true,
             message: 'Report deleted successfully',
@@ -955,6 +1029,23 @@ const getNearbyReports = async (req, res) => {
         }
 
         console.log(`🌍 Fetching reports within ${radius}km of (${latitude}, ${longitude})`);
+
+        // Create cache key based on location and parameters (round coordinates to reduce cache variations)
+        const roundedLat = parseFloat(latitude).toFixed(3);
+        const roundedLng = parseFloat(longitude).toFixed(3);
+        const cacheKey = `nearby_reports:${roundedLat}:${roundedLng}:${radius}:${limit}:${offset}:${currentUserId}`;
+        
+        // Try to get from Redis cache first
+        const cachedReports = await redisService.getCachedReports(cacheKey);
+        if (cachedReports) {
+            console.log('📦 Returning cached nearby reports');
+            return res.status(200).json({
+                success: true,
+                reports: cachedReports.reports,
+                pagination: cachedReports.pagination,
+                cached: true
+            });
+        }
 
         // Using the haversine formula to calculate distance
         const nearbyQuery = `
@@ -1015,14 +1106,26 @@ const getNearbyReports = async (req, res) => {
 
         console.log(`✅ Found ${mappedReports.length} nearby reports`);
 
-        res.status(200).json({
-            success: true,
+        const responseData = {
             reports: mappedReports,
             pagination: {
                 limit: parseInt(limit),
                 offset: parseInt(offset),
+                total: mappedReports.length
+            },
+            location: {
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
                 radius: parseFloat(radius)
             }
+        };
+
+        // Cache the results for 3 minutes (shorter cache for location-based data)
+        await redisService.cacheReports(cacheKey, responseData, 180);
+
+        res.status(200).json({
+            success: true,
+            ...responseData
         });
 
     } catch (error) {
@@ -1320,6 +1423,23 @@ const getAdminReports = async (req, res) => {
 
         console.log('👤 Admin role:', adminRole, 'Department:', adminDepartment);
 
+        // Create cache key based on admin info and all parameters
+        const cacheKey = `admin_reports:${adminId}:${adminRole}:${adminDepartment || 'none'}:${isResolved || 'all'}:${category || 'all'}:${priority || 'all'}:${department || 'all'}:${status || 'all'}:${limit}:${offset}`;
+        
+        // Try to get from Redis cache first
+        const cachedReports = await redisService.getCachedReports(cacheKey);
+        if (cachedReports) {
+            console.log('📦 Returning cached admin reports');
+            return res.status(200).json({
+                success: true,
+                reports: cachedReports.reports,
+                pagination: cachedReports.pagination,
+                adminInfo: cachedReports.adminInfo,
+                message: cachedReports.message,
+                cached: true
+            });
+        }
+
         // Build dynamic query based on role and filters
         let baseQuery = `
             SELECT
@@ -1476,8 +1596,7 @@ const getAdminReports = async (req, res) => {
 
         console.log(`✅ Found ${mappedReports.length} reports for admin ${adminId} (role: ${adminRole})`);
 
-        res.status(200).json({
-            success: true,
+        const responseData = {
             reports: mappedReports,
             pagination: {
                 total: totalCount,
@@ -1491,6 +1610,14 @@ const getAdminReports = async (req, res) => {
                 canViewAllDepartments: adminRole !== 'viewer'
             },
             message: `Reports fetched successfully for ${adminRole}`
+        };
+
+        // Cache the results for 10 minutes (longer cache for admin data)
+        await redisService.cacheReports(cacheKey, responseData, 600);
+
+        res.status(200).json({
+            success: true,
+            ...responseData
         });
 
     } catch (error) {

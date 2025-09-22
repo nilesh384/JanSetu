@@ -27,7 +27,14 @@ class EmailService {
         html: `
   <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background-color: #f4f6f9;">
     <div style="background-color: #ffffff; padding: 32px; border-radius: 12px; box-shadow: 0 4px 14px rgba(0,0,0,0.08);">
-      
+      <!-- Logo -->
+      <div style="text-align: center; margin-bottom: 28px;">
+        <div style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #FF6B35, #F7931E); border-radius: 8px; margin-bottom: 16px;">
+          <span style="font-size: 24px; font-weight: bold; color: white;">JanSetu</span>
+        </div>
+        <div style="height: 2px; background: linear-gradient(90deg, #FF6B35, #F7931E); border-radius: 1px;"></div>
+      </div>
+
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 28px;">
         <h1 style="color: #111827; font-size: 22px; margin: 0;">JanSetu Admin Portal</h1>

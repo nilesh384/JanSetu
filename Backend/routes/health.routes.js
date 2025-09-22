@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getConnectionStatus, getPool } from "../db/utils.js";
+import redisService from "../services/redis.js";
 
 const router = Router();
 
@@ -10,6 +11,7 @@ const router = Router();
 router.get("/", async (req, res) => {
   try {
     const dbStatus = getConnectionStatus();
+    const redisStatus = redisService.isAvailable();
     
     const healthData = {
       status: "healthy",
@@ -22,6 +24,10 @@ router.get("/", async (req, res) => {
         waitingClients: dbStatus.waitingClients,
         connectionAttempts: dbStatus.attempts,
         lastError: dbStatus.lastError
+      },
+      redis: {
+        connected: redisStatus,
+        status: redisStatus ? 'Connected' : 'Disconnected'
       },
       environment: process.env.NODE_ENV || 'development'
     };
