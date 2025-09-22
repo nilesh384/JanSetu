@@ -1,5 +1,6 @@
 import { query, queryOne, transaction } from "../db/utils.js";
 import emailService from "../services/emailService.js";
+import redisService from "../services/redis.js";
 
 // Helper to convert DB timestamp values to ISO strings (null-safe)
 const toISO = (val) => (val ? new Date(val).toISOString() : null);
@@ -339,6 +340,24 @@ const getAllAdmins = async (req, res) => {
             });
         }
 
+        // Generate cache key based on requester role and requested roles
+        const cacheKey = `admins:${requesterRole.toLowerCase()}:${requestedRoles ? requestedRoles.sort().join(',') : 'all'}`;
+
+        // Try to get from cache first
+        try {
+            const cachedData = await redisService.getCachedReports(cacheKey);
+            if (cachedData) {
+                console.log('✅ Retrieved admins from cache for role:', requesterRole);
+                return res.status(200).json({
+                    success: true,
+                    ...cachedData,
+                    cached: true
+                });
+            }
+        } catch (cacheError) {
+            console.log('⚠️ Cache read failed, proceeding with database query:', cacheError.message);
+        }
+
         console.log('🔍 Getting admins for role:', requesterRole, 'requested roles:', requestedRoles);
         console.log('🔍 requestedRoles type:', typeof requestedRoles);
         console.log('🔍 requestedRoles isArray:', Array.isArray(requestedRoles));
@@ -468,8 +487,7 @@ const getAllAdmins = async (req, res) => {
 
         console.log(`✅ Retrieved ${admins.length} admins for ${requesterRole} with filter: ${filterRoles.join(', ')}`);
 
-        return res.status(200).json({
-            success: true,
+        const responseData = {
             message: `Admins retrieved successfully for ${requesterRole}`,
             data: adminsData,
             meta: {
@@ -480,6 +498,18 @@ const getAllAdmins = async (req, res) => {
                 canFilterByRole: canFilterByRole,
                 totalCount: admins.length
             }
+        };
+
+        // Cache the results for 10 minutes (admin data changes less frequently)
+        try {
+            await redisService.cacheReports(cacheKey, responseData, 600);
+        } catch (cacheError) {
+            console.log('⚠️ Failed to cache admin data:', cacheError.message);
+        }
+
+        return res.status(200).json({
+            success: true,
+            ...responseData
         });
 
     } catch (error) {

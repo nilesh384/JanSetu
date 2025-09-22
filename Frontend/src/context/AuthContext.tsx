@@ -37,9 +37,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Storage keys - Only store minimal data locally
 const STORAGE_KEYS = {
-  USER_ID: '@crowdsource_user_id',
+  USER_DATA: '@crowdsource_user_data',
+  AUTH_TOKEN: '@crowdsource_auth_token',
   LOGIN_TIME: '@crowdsource_login_time',
-  REQUIRES_PROFILE_SETUP: '@crowdsource_requires_profile_setup',
 };
 
 // Auth Provider Component
@@ -56,14 +56,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const checkAuthStatus = async () => {
     try {
       setIsLoading(true);
-      
-      const [storedUserId, storedLoginTime, storedProfileSetup] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.USER_ID),
+      setHasNetworkError(false);
+
+      const [storedUserData, storedLoginTime] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.USER_DATA),
         AsyncStorage.getItem(STORAGE_KEYS.LOGIN_TIME),
-        AsyncStorage.getItem(STORAGE_KEYS.REQUIRES_PROFILE_SETUP),
       ]);
 
-      if (storedUserId && storedLoginTime) {
+      if (storedUserData && storedLoginTime) {
         const loginTime = new Date(storedLoginTime);
         const now = new Date();
         
@@ -71,12 +71,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const daysSinceLogin = (now.getTime() - loginTime.getTime()) / (1000 * 60 * 60 * 24);
         
         if (daysSinceLogin < 30) {
-          // Session is still valid, fetch user data from database
-          console.log('✅ Valid session found, fetching user data...');
-          await refreshUser(storedUserId);
+          // Session is still valid, use stored user data
+          const userData = JSON.parse(storedUserData);
+          setUser(userData);
           
-          // Set profile setup requirement from storage
-          setRequiresProfileSetup(storedProfileSetup === 'true');
+          // Check if profile setup is required
+          const needsProfileSetup = !userData.fullName || !userData.email;
+          setRequiresProfileSetup(needsProfileSetup);
+          
+          console.log('✅ Valid session found, user authenticated');
+          
+          // Optionally refresh user data in background (don't block UI)
+          refreshUserInBackground(userData.id);
         } else {
           // Session expired, clear storage
           console.log('⏰ Session expired, clearing storage');
@@ -86,124 +92,83 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('🔐 No stored authentication found');
       }
     } catch (error) {
-      const errorMessage = (error as Error).message;
-      console.error('❌ Error checking auth status:', errorMessage);
-
-      // Check if it's a network error
-      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
-                            errorMessage.toLowerCase().includes('connection') ||
-                            errorMessage.toLowerCase().includes('timeout') ||
-                            errorMessage.toLowerCase().includes('fetch');
-
-      if (isNetworkError) {
-        console.log('🌐 Network error during auth check, will retry when online');
-        setHasNetworkError(true);
-        // Keep loading state true for network errors
-      } else {
-        // Only clear auth data for non-network errors
-        console.log('❌ Non-network error during auth check, clearing auth data');
-        setIsLoading(false); // Clear loading state for non-network errors
-        await clearAuthStorage();
-      }
+      console.error('❌ Error checking auth status:', error);
+      // Clear potentially corrupted data
+      await clearAuthStorage();
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Refresh user data from database
-  const refreshUser = async (userId?: string, retryCount = 0) => {
-    const maxRetries = 3;
-    const retryDelay = 2000; // 2 seconds
-
+  // Background refresh - don't block UI, just update data silently
+  const refreshUserInBackground = async (userId: string) => {
     try {
-      const userIdToUse = userId || user?.id;
-      if (!userIdToUse) {
-        throw new Error('No user ID available');
-      }
-
-      console.log(`🔄 Refreshing user data from database... (attempt ${retryCount + 1})`);
-      const result = await getUserById(userIdToUse) as any;
+      console.log('🔄 Refreshing user data in background...');
+      const result = await getUserById(userId) as any;
 
       if (result.success && result.user) {
+        // Update stored user data
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(result.user));
+        
+        // Update state only if user is still logged in
+        if (user?.id === userId) {
+          setUser(result.user);
+          const needsProfileSetup = !result.user.fullName || !result.user.email;
+          setRequiresProfileSetup(needsProfileSetup);
+        }
+        
+        console.log('✅ User data refreshed in background');
+      }
+    } catch (error) {
+      console.log('⚠️ Background refresh failed, keeping existing data:', error);
+      // Don't clear auth data for background refresh failures
+    }
+  };
+
+  // Refresh user data (called when needed, like after profile update)
+  const refreshUser = async () => {
+    if (!user?.id) return;
+
+    try {
+      setIsLoading(true);
+      const result = await getUserById(user.id) as any;
+
+      if (result.success && result.user) {
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(result.user));
         setUser(result.user);
-        setRequiresProfileSetup(result.requiresProfileSetup || false);
-        setHasNetworkError(false); // Clear network error on success
-        setIsLoading(false); // Clear loading state on success
-
-        // Update profile setup requirement in storage
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.REQUIRES_PROFILE_SETUP,
-          String(result.requiresProfileSetup || false)
-        );
-
+        
+        const needsProfileSetup = !result.user.fullName || !result.user.email;
+        setRequiresProfileSetup(needsProfileSetup);
+        
         console.log('✅ User data refreshed successfully');
-        return; // Success, exit function
       } else {
         throw new Error(result.message || 'Failed to fetch user data');
       }
     } catch (error) {
-      const errorMessage = (error as Error).message;
-      console.error(`❌ Error refreshing user data (attempt ${retryCount + 1}):`, errorMessage);
-
-      // Check if it's a network-related error
-      const isNetworkError = errorMessage.toLowerCase().includes('network') ||
-                            errorMessage.toLowerCase().includes('connection') ||
-                            errorMessage.toLowerCase().includes('timeout') ||
-                            errorMessage.toLowerCase().includes('fetch') ||
-                            !navigator.onLine; // Check if browser reports offline
-
-      if (isNetworkError && retryCount < maxRetries) {
-        console.log(`🌐 Network error detected, retrying in ${retryDelay}ms... (${retryCount + 1}/${maxRetries})`);
-        setHasNetworkError(true);
-        // Keep loading state true during retries
-
-        // Retry after delay
-        setTimeout(() => {
-          refreshUser(userId, retryCount + 1);
-        }, retryDelay);
-        return; // Don't clear auth data on network errors
-      }
-
-      // If it's not a network error or we've exhausted retries, handle as auth error
-      if (!isNetworkError || retryCount >= maxRetries) {
-        console.log('❌ Non-network error or max retries reached, clearing auth data');
-        setHasNetworkError(false); // Clear network error flag
-        setIsLoading(false); // Clear loading state
-        //FIXME:
-        // await clearAuthStorage();
-        // setUser(null);
-        // setRequiresProfileSetup(false);
-      }
+      console.error('❌ Error refreshing user data:', error);
+      // Don't clear auth data for refresh failures
+    } finally {
+      setIsLoading(false);
     }
-  };  // Login function (called after successful OTP verification)
+  };
+
+  // Login function (called after successful OTP verification)
   const login = async (userData: User, requiresProfileSetupFlag?: boolean) => {
     try {
       console.log('🔐 Starting login process for user:', userData.id);
-      console.log('👤 User data received:', userData);
       
       const loginTime = new Date().toISOString();
       const profileSetupRequired = requiresProfileSetupFlag ?? (!userData.fullName || !userData.email);
       
-      console.log('📝 Profile setup required:', profileSetupRequired);
-      console.log('💾 Saving to AsyncStorage...');
-
-      // Save minimal data to AsyncStorage
+      // Save complete user data and login time to AsyncStorage
       await Promise.all([
-        AsyncStorage.setItem(STORAGE_KEYS.USER_ID, userData.id),
+        AsyncStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userData)),
         AsyncStorage.setItem(STORAGE_KEYS.LOGIN_TIME, loginTime),
-        AsyncStorage.setItem(STORAGE_KEYS.REQUIRES_PROFILE_SETUP, String(profileSetupRequired)),
       ]);
 
-      console.log('✅ Data saved to AsyncStorage');
       setUser(userData);
       setRequiresProfileSetup(profileSetupRequired);
       console.log('✅ User logged in successfully:', userData.id);
-      
-      if (profileSetupRequired) {
-        console.log('📝 Profile setup required');
-      } else {
-        console.log('👋 Welcome back!');
-      }
       
     } catch (error) {
       console.error('❌ Error during login:', error);
@@ -226,9 +191,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Clear all auth-related storage
   const clearAuthStorage = async () => {
     await Promise.all([
-      AsyncStorage.removeItem(STORAGE_KEYS.USER_ID),
+      AsyncStorage.removeItem(STORAGE_KEYS.USER_DATA),
       AsyncStorage.removeItem(STORAGE_KEYS.LOGIN_TIME),
-      AsyncStorage.removeItem(STORAGE_KEYS.REQUIRES_PROFILE_SETUP),
+      AsyncStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN),
     ]);
   };
 
@@ -237,26 +202,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     checkAuthStatus();
   }, []);
 
-  // Network monitoring for retry logic
+  // Simple network monitoring - just clear network error flag when back online
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       const isOnline = state.isConnected && state.isInternetReachable;
-
-      if (isOnline && hasNetworkError && user?.id) {
-        console.log('🌐 Network restored, retrying user data refresh...');
+      
+      if (isOnline && hasNetworkError) {
+        console.log('🌐 Network restored');
         setHasNetworkError(false);
-        // Keep loading state true during retry
-        refreshUser(user.id, 0);
-      } else if (isOnline && hasNetworkError && !user?.id) {
-        // If we have network but no user, try to check auth status again
-        console.log('🌐 Network restored, checking auth status...');
-        setHasNetworkError(false);
-        checkAuthStatus();
       }
     });
 
     return () => unsubscribe();
-  }, [hasNetworkError, user?.id]);
+  }, [hasNetworkError]);
 
   const value: AuthContextType = {
     user,

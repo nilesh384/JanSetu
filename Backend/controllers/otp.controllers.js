@@ -1,5 +1,6 @@
 import { generateOTP, storeOTP, verifyOTP, sendOTP, sendTestOtp, getStoredOTPs } from "../services/sendSms.js";
 import { query, transaction } from "../db/utils.js";
+import redisService from "../services/redis.js";
 
 // Send OTP to phone number
 export const sendOTPController = async (req, res) => {
@@ -15,10 +16,26 @@ export const sendOTPController = async (req, res) => {
       });
     }
     
+    // Rate limiting: 5 OTP requests per hour per phone number
+    const rateLimitResult = await redisService.checkRateLimit(
+      `otp_send:${phoneNumber}`, 
+      5, 
+      3600 // 1 hour
+    );
+    
+    if (!rateLimitResult.allowed) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many OTP requests. Please try again later.",
+        resetTime: rateLimitResult.resetTime
+      });
+    }
+    
     // Generate 6-digit OTP
     const otp = generateOTP();
     
-    // Store OTP in memory (expires in 5 minutes)
+    // Store OTP in Redis (expires in 5 minutes) and memory as fallback
+    await redisService.cacheOTP(phoneNumber, otp, 300);
     storeOTP(phoneNumber, otp);
     
     // Send OTP via SMS
@@ -62,7 +79,18 @@ export const verifyOTPController = async (req, res) => {
       });
     }
     
-    const result = verifyOTP(phoneNumber, otp);
+    // First try to verify OTP from Redis cache
+    const cachedOTP = await redisService.getCachedOTP(phoneNumber);
+    let result;
+    
+    if (cachedOTP && cachedOTP === otp) {
+      result = { success: true };
+      // Invalidate OTP after successful verification
+      await redisService.invalidateOTP(phoneNumber);
+    } else {
+      // Fallback to memory-based verification
+      result = verifyOTP(phoneNumber, otp);
+    }
     
     if (result.success) {
       console.log('✅ OTP verified, creating/logging in user...');
