@@ -1,29 +1,30 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
-import { useRouter } from 'expo-router';
 import NetInfo from '@react-native-community/netinfo';
+import { useRouter } from 'expo-router';
 
-import { createReport } from '../../api/report.js';
-import { uploadReportMedia } from '../../api/media';
 import { useAuth } from '@/src/context/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { uploadReportMedia } from '../../api/media';
+import { createReport } from '../../api/report.js';
+import { createSocialPost } from '../../api/social.js';
 import offlineStorage from '../../services/offlineStorage';
 
 interface LocationData {
@@ -38,110 +39,110 @@ export default function Post() {
   const { t } = useTranslation();
 
   const issueCategories = [
-    { 
-      id: 1, 
-      name: t('profile.categoryRoadsInfrastructure'), 
+    {
+      id: 1,
+      name: t('profile.categoryRoadsInfrastructure'),
       description: t('profile.categoryRoadsDesc'),
       department: t('profile.categoryRoadsDept'),
       icon: 'map'
     },
-    { 
-      id: 2, 
-      name: t('profile.categoryLighting'), 
+    {
+      id: 2,
+      name: t('profile.categoryLighting'),
       description: t('profile.categoryLightingDesc'),
       department: t('profile.categoryLightingDept'),
       icon: 'lightbulb'
     },
-    { 
-      id: 3, 
-      name: t('profile.categorySanitation'), 
+    {
+      id: 3,
+      name: t('profile.categorySanitation'),
       description: t('profile.categorySanitationDesc'),
       department: t('profile.categorySanitationDept'),
       icon: 'delete'
     },
-    { 
-      id: 4, 
-      name: t('profile.categoryWater'), 
+    {
+      id: 4,
+      name: t('profile.categoryWater'),
       description: t('profile.categoryWaterDesc'),
       department: t('profile.categoryWaterDept'),
       icon: 'water'
     },
-    { 
-      id: 5, 
-      name: t('profile.categoryHealth'), 
+    {
+      id: 5,
+      name: t('profile.categoryHealth'),
       description: t('profile.categoryHealthDesc'),
       department: t('profile.categoryHealthDept'),
       icon: 'healing'
     },
-    { 
-      id: 6, 
-      name: t('profile.categoryParks'), 
+    {
+      id: 6,
+      name: t('profile.categoryParks'),
       description: t('profile.categoryParksDesc'),
       department: t('profile.categoryParksDept'),
       icon: 'park'
     },
-    { 
-      id: 7, 
-      name: t('profile.categoryTraffic'), 
+    {
+      id: 7,
+      name: t('profile.categoryTraffic'),
       description: t('profile.categoryTrafficDesc'),
       department: t('profile.categoryTrafficDept'),
       icon: 'traffic'
     },
-    { 
-      id: 8, 
-      name: t('profile.categorySafety'), 
+    {
+      id: 8,
+      name: t('profile.categorySafety'),
       description: t('profile.categorySafetyDesc'),
       department: t('profile.categorySafetyDept'),
       icon: 'warning'
     },
-    { 
-      id: 9, 
-      name: t('profile.categoryEducation'), 
+    {
+      id: 9,
+      name: t('profile.categoryEducation'),
       description: t('profile.categoryEducationDesc'),
       department: t('profile.categoryEducationDept'),
       icon: 'school'
     },
-    { 
-      id: 10, 
-      name: t('profile.categoryEncroachments'), 
+    {
+      id: 10,
+      name: t('profile.categoryEncroachments'),
       description: t('profile.categoryEncroachmentsDesc'),
       department: t('profile.categoryEncroachmentsDept'),
       icon: 'domain'
     },
-    { 
-      id: 11, 
-      name: t('profile.categoryEnvironment'), 
+    {
+      id: 11,
+      name: t('profile.categoryEnvironment'),
       description: t('profile.categoryEnvironmentDesc'),
       department: t('profile.categoryEnvironmentDept'),
       icon: 'public'
     },
-    { 
-      id: 12, 
-      name: t('profile.categoryAnimal'), 
+    {
+      id: 12,
+      name: t('profile.categoryAnimal'),
       description: t('profile.categoryAnimalDesc'),
       department: t('profile.categoryAnimalDept'),
       icon: 'pets'
     },
-    { 
-      id: 13, 
-      name: t('profile.categoryServices'), 
+    {
+      id: 13,
+      name: t('profile.categoryServices'),
       description: t('profile.categoryServicesDesc'),
       department: t('profile.categoryServicesDept'),
       icon: 'assignment'
     },
-    { 
-      id: 14, 
-      name: t('profile.categoryOthers'), 
+    {
+      id: 14,
+      name: t('profile.categoryOthers'),
       description: t('profile.categoryOthersDesc'),
       department: t('profile.categoryOthersDept'),
       icon: 'ellipsis-horizontal'
     }
   ];
-  
+
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [mediaItems, setMediaItems] = useState<Array<{id: string, uri: string, type: 'image' | 'video'}>>([]);
+  const [mediaItems, setMediaItems] = useState<Array<{ id: string, uri: string, type: 'image' | 'video' }>>([]);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -151,7 +152,7 @@ export default function Post() {
   const [isOnline, setIsOnline] = useState(true);
   const [offlineReportsCount, setOfflineReportsCount] = useState(0);
 
-  
+
   // Audio recording states
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordingUri, setRecordingUri] = useState<string | null>(null);
@@ -222,27 +223,27 @@ export default function Post() {
       const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.BestForNavigation,
       });
-      
+
       const address = await Location.reverseGeocodeAsync({
         latitude: currentLocation.coords.latitude,
         longitude: currentLocation.coords.longitude,
       });
 
       const addr = address[0];
-    const locationParts = [
-      addr?.name,
-      addr?.street,
-      addr?.streetNumber,
-      addr?.district,
-      addr?.subregion,
-      addr?.city,
-      addr?.region,
-      addr?.postalCode
-    ].filter(Boolean);
+      const locationParts = [
+        addr?.name,
+        addr?.street,
+        addr?.streetNumber,
+        addr?.district,
+        addr?.subregion,
+        addr?.city,
+        addr?.region,
+        addr?.postalCode
+      ].filter(Boolean);
 
-    const locationAddress = locationParts.length > 0 
-      ? locationParts.join(', ')
-      : 'Current Location';
+      const locationAddress = locationParts.length > 0
+        ? locationParts.join(', ')
+        : 'Current Location';
 
 
       setLocation({
@@ -272,9 +273,9 @@ export default function Post() {
 
     // Check if there's already a video
     const hasVideo = mediaItems.some(item => item.type === 'video');
-    
+
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (permissionResult.granted === false) {
       Alert.alert(t('post.permissionRequired'));
       return;
@@ -361,25 +362,25 @@ export default function Post() {
     try {
       // Generate unique ID
       const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
-      
+
       let finalUri = uri;
 
       // For images, compress using expo-image-manipulator (much more efficient)
       if (type === 'image') {
         console.log('🔄 Compressing image...');
-        
+
         // Get image dimensions first to determine optimal resize strategy
-        const { width, height } = await new Promise<{width: number, height: number}>((resolve) => {
+        const { width, height } = await new Promise<{ width: number, height: number }>((resolve) => {
           Image.getSize(uri, (width, height) => resolve({ width, height }));
         });
-        
+
         console.log(`📏 Original image size: ${width}x${height}`);
-        
+
         // Calculate optimal dimensions while maintaining aspect ratio
         const maxDimension = 1920;
         let newWidth = width;
         let newHeight = height;
-        
+
         if (width > maxDimension || height > maxDimension) {
           const aspectRatio = width / height;
           if (width > height) {
@@ -390,12 +391,12 @@ export default function Post() {
             newWidth = Math.round(maxDimension * aspectRatio);
           }
         }
-        
+
         console.log(`📐 Target size: ${newWidth}x${newHeight}`);
 
         const manipulatedImage = await ImageManipulator.manipulateAsync(
           uri,
-          width > maxDimension || height > maxDimension 
+          width > maxDimension || height > maxDimension
             ? [{ resize: { width: newWidth, height: newHeight } }]
             : [], // No resize needed if image is already small
           {
@@ -404,7 +405,7 @@ export default function Post() {
             base64: false
           }
         );
-        
+
         finalUri = manipulatedImage.uri;
         console.log('✅ Image compressed successfully');
       }
@@ -440,7 +441,7 @@ export default function Post() {
         (status) => {
           if (status.isRecording) {
             setRecordingDuration(Math.floor((status.durationMillis || 0) / 1000));
-            
+
             // Stop recording after 60 seconds (limit)
             if ((status.durationMillis || 0) >= 60000) {
               stopRecording();
@@ -550,21 +551,21 @@ export default function Post() {
       setIsUploadingMedia(true);
       setUploadProgress(t('post.uploadingMedia'));
       console.log('📁 Uploading media files to Cloudinary...');
-      
+
       // Retry logic for media upload
       let uploadAttempts = 0;
       const maxRetries = 3;
       let uploadResult = null;
-      
+
       while (uploadAttempts < maxRetries && !uploadResult?.success) {
         try {
           uploadAttempts++;
           if (uploadAttempts > 1) {
             setUploadProgress(t('post.retryingUpload', { attempt: uploadAttempts, max: maxRetries }));
           }
-          
+
           uploadResult = await uploadReportMedia(mediaItems, recordingUri || undefined, user?.id || '');
-          
+
           if (uploadResult.success) {
             break;
           }
@@ -577,28 +578,28 @@ export default function Post() {
           await new Promise(resolve => setTimeout(resolve, 1000 * uploadAttempts));
         }
       }
-      
+
       if (!uploadResult?.success) {
         throw new Error(uploadResult?.message || 'Failed to upload media files after multiple attempts');
       }
 
       uploadedMediaUrls = uploadResult.mediaUrls || [];
       uploadedAudioUrl = uploadResult.audioUrl || '';
-      
+
       console.log('✅ Media uploaded successfully:', {
         mediaUrls: uploadedMediaUrls,
         audioUrl: uploadedAudioUrl
       });
-      
+
       setIsUploadingMedia(false);
       setUploadProgress(t('post.mediaUploaded'));
     }
 
     // Get department from selected category
     const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
-    
+
     setUploadProgress(t('post.creatingReport'));
-    
+
     // Step 2: Create report data with Cloudinary URLs
     const reportData = {
       userId: user?.id || '',
@@ -617,15 +618,24 @@ export default function Post() {
     // Step 3: Call the actual API to create the report with retry logic
     let reportAttempts = 0;
     const maxReportRetries = 2;
-    let reportResponse = null;
-    
+    // Define a type for the report response
+    type ReportResponse = {
+      report?: {
+        id?: string;
+        [key: string]: any;
+      };
+      [key: string]: any;
+    };
+
+    let reportResponse: ReportResponse | null = null;
+
     while (reportAttempts < maxReportRetries && !reportResponse) {
       try {
         reportAttempts++;
         if (reportAttempts > 1) {
           setUploadProgress(t('post.retryingReport', { attempt: reportAttempts, max: maxReportRetries }));
         }
-        
+
         reportResponse = await createReport(reportData);
         break;
       } catch (reportError) {
@@ -640,9 +650,58 @@ export default function Post() {
 
     setUploadProgress(t('post.reportSubmitted'));
 
+    // Step 4: Automatically create a social post from the report
+    let socialPostCreated = false;
+    try {
+      setUploadProgress('Creating social post...');
+      if (reportResponse && (reportResponse as ReportResponse).report?.id) {
+        console.log('📱 Automatically creating social post for report:', (reportResponse as ReportResponse).report?.id);
+
+        const socialPostData = {
+          userId: user?.id || '',
+          reportId: (reportResponse as ReportResponse).report?.id || '',
+          title: title.trim(),
+          content: description.trim()
+        };
+
+        const socialPostResponse = await createSocialPost(socialPostData) as { success: boolean; post?: { id?: string }; message?: string };
+
+        if (socialPostResponse.success) {
+          socialPostCreated = true;
+          console.log('✅ Social post created successfully:', socialPostResponse.post?.id);
+        } else {
+          // Check if the error is because social post already exists
+          if (socialPostResponse.message?.includes('Social post already exists')) {
+            socialPostCreated = true;
+            console.log('✅ Social post already exists for this report - treating as success');
+          } else {
+            console.warn('⚠️ Failed to create social post:', socialPostResponse.message);
+          }
+        }
+      } else {
+        console.warn('⚠️ Cannot create social post: reportResponse or report id is null');
+      }
+    } catch (socialError) {
+      // Check if the error is because social post already exists
+      const errorMessage = socialError instanceof Error ? socialError.message : String(socialError);
+      if (errorMessage.includes('Social post already exists')) {
+        socialPostCreated = true;
+        console.log('✅ Social post already exists for this report - treating as success');
+      } else {
+        console.error('❌ Error creating social post:', socialError);
+      }
+      // Don't throw error for social post failure - report was still successful
+    }
+
+    setUploadProgress(t('post.reportSubmitted'));
+
+    const alertMessage = socialPostCreated
+      ? `Your report has been submitted and shared to the social feed!\n\nAssigned to: ${selectedCategoryData?.department}\nYou will receive updates on the progress.`
+      : `Your report has been submitted!\n\nAssigned to: ${selectedCategoryData?.department}\nYou will receive updates on the progress.`;
+
     Alert.alert(
       t('post.reportSubmitted'),
-      `Your report has been submitted!\n\nAssigned to: ${selectedCategoryData?.department}\nYou will receive updates on the progress.`,
+      alertMessage,
       [
         {
           text: 'OK',
@@ -667,11 +726,11 @@ export default function Post() {
     try {
       setIsSubmitting(true);
       await offlineStorage.triggerAutoUpload();
-      
+
       // Refresh the count
       const count = await offlineStorage.getOfflineReportsCount();
       setOfflineReportsCount(count);
-      
+
       Alert.alert(
         t('post.uploadSuccess'),
         t('post.allReportsUploaded')
@@ -693,17 +752,17 @@ export default function Post() {
     setIsSubmitting(true);
     setIsUploadingMedia(false);
     setUploadProgress('');
-    
+
     try {
       // Check network status
       const networkStatus = await offlineStorage.checkNetworkStatus();
-      
+
       if (!networkStatus) {
         // Offline: Save report locally
         console.log('📱 Device is offline, saving report locally...');
-        
+
         const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
-        
+
         const reportData = {
           userId: user?.id || '',
           title: title.trim(),
@@ -722,7 +781,7 @@ export default function Post() {
         };
 
         const offlineId = await offlineStorage.saveOfflineReport(reportData);
-        
+
         Alert.alert(
           t('post.reportSavedOffline'),
           t('post.reportWillUploadWhenOnline'),
@@ -743,24 +802,24 @@ export default function Post() {
             },
           ]
         );
-        
+
         return;
       }
 
       // Online: Proceed with normal submission
       await submitOnlineReport();
-      
+
     } catch (error) {
       console.error('Error in submitReport:', error);
       const errorMessage = (error instanceof Error) ? error.message : 'Please check your connection and try again';
       setUploadProgress('');
       setIsUploadingMedia(false);
-      
+
       // If it's a network error, offer to save offline
-      if (errorMessage.toLowerCase().includes('network') || 
-          errorMessage.toLowerCase().includes('connection') ||
-          errorMessage.toLowerCase().includes('timeout')) {
-        
+      if (errorMessage.toLowerCase().includes('network') ||
+        errorMessage.toLowerCase().includes('connection') ||
+        errorMessage.toLowerCase().includes('timeout')) {
+
         Alert.alert(
           t('post.networkError'),
           t('post.saveOfflineQuestion'),
@@ -774,7 +833,7 @@ export default function Post() {
               onPress: async () => {
                 try {
                   const selectedCategoryData = issueCategories.find(cat => cat.id === selectedCategory);
-                  
+
                   const reportData = {
                     userId: user?.id || '',
                     title: title.trim(),
@@ -793,12 +852,12 @@ export default function Post() {
 
                   const offlineId = await offlineStorage.saveOfflineReport(reportData);
                   setOfflineReportsCount(prev => prev + 1);
-                  
+
                   Alert.alert(
                     t('post.reportSavedOffline'),
                     t('post.reportWillUploadWhenOnline')
                   );
-                  
+
                   // Reset form
                   setTitle('');
                   setDescription('');
@@ -807,7 +866,7 @@ export default function Post() {
                   removeRecording();
                   setUploadProgress('');
                   router.back();
-                  
+
                 } catch (offlineError) {
                   console.error('Error saving offline:', offlineError);
                   Alert.alert(t('error'), t('post.failedToSaveOffline'));
@@ -843,12 +902,12 @@ export default function Post() {
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-  <TouchableOpacity onPress={() => router.back()}>
-    <Ionicons name="arrow-back" size={24} color="#333" />
-  </TouchableOpacity>
-  <Text style={styles.headerTitle}>{t('post.reportCivicIssue')}</Text>
-  <View style={{ width: 24 }} />
-</View>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('post.reportCivicIssue')}</Text>
+          <View style={{ width: 24 }} />
+        </View>
 
         {/* Offline Status Banner */}
         {!isOnline && (
@@ -867,7 +926,7 @@ export default function Post() {
 
         {/* Manual Upload Button for Online with Pending Reports */}
         {isOnline && offlineReportsCount > 0 && (
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.manualUploadBanner}
             onPress={handleAutoUpload}
           >
@@ -881,38 +940,38 @@ export default function Post() {
 
         {/* Issue Category Selection */}
         <View style={styles.section}>
-  <Text style={styles.sectionTitle}>{t('post.issueCategory')}</Text>
-  <TouchableOpacity 
-    style={styles.dropdownButton}
-    onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
-  >
-    <Text style={styles.dropdownText}>
-      {selectedCategory !== null ? issueCategories.find(c => c.id === selectedCategory)?.name : t('post.selectCategory')}
-    </Text>
-    <Ionicons name="chevron-down" size={20} color="#666" />
-  </TouchableOpacity>
-  
-  {showCategoryDropdown && (
-    <View style={styles.dropdownList}>
-      {issueCategories.map(category => (
-        <TouchableOpacity
-          key={category.id}
-          style={styles.dropdownItem}
-          onPress={() => {
-            setSelectedCategory(category.id);
-            setShowCategoryDropdown(false);
-          }}
-        >
-          <MaterialIcons name={category.icon as any} size={20} color="#FF6B35" />
-          <View style={styles.categoryTextContainer}>
-            <Text style={styles.dropdownItemText}>{category.name}</Text>
-            <Text style={styles.categoryDescription}>{category.description}</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </View>
-  )}
-</View>
+          <Text style={styles.sectionTitle}>{t('post.issueCategory')}</Text>
+          <TouchableOpacity
+            style={styles.dropdownButton}
+            onPress={() => setShowCategoryDropdown(!showCategoryDropdown)}
+          >
+            <Text style={styles.dropdownText}>
+              {selectedCategory !== null ? issueCategories.find(c => c.id === selectedCategory)?.name : t('post.selectCategory')}
+            </Text>
+            <Ionicons name="chevron-down" size={20} color="#666" />
+          </TouchableOpacity>
+
+          {showCategoryDropdown && (
+            <View style={styles.dropdownList}>
+              {issueCategories.map(category => (
+                <TouchableOpacity
+                  key={category.id}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setSelectedCategory(category.id);
+                    setShowCategoryDropdown(false);
+                  }}
+                >
+                  <MaterialIcons name={category.icon as any} size={20} color="#FF6B35" />
+                  <View style={styles.categoryTextContainer}>
+                    <Text style={styles.dropdownItemText}>{category.name}</Text>
+                    <Text style={styles.categoryDescription}>{category.description}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
 
 
         {/* Priority Selection - Automatically determined by system */}
@@ -950,7 +1009,7 @@ export default function Post() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('post.photosVideos')}</Text>
           <Text style={styles.sectionSubtitle}>{t('post.mediaSubtitle')}</Text>
-          
+
           {mediaItems.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaScrollView}>
               {mediaItems.map((item) => (
@@ -965,8 +1024,8 @@ export default function Post() {
                       </View>
                     </View>
                   )}
-                  <TouchableOpacity 
-                    style={styles.removeMediaButton} 
+                  <TouchableOpacity
+                    style={styles.removeMediaButton}
                     onPress={() => removeMediaItem(item.id)}
                   >
                     <Ionicons name="close" size={16} color="#FFFFFF" style={{ zIndex: 100 }} />
@@ -975,7 +1034,7 @@ export default function Post() {
               ))}
             </ScrollView>
           )}
-          
+
           {mediaItems.length < 3 && (
             <TouchableOpacity style={styles.mediaUploadCard} onPress={pickMedia}>
               <MaterialIcons name="add-a-photo" size={32} color="#666666" />
@@ -991,18 +1050,18 @@ export default function Post() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t('post.voiceRecording')}</Text>
           <Text style={styles.sectionSubtitle}>{t('post.voiceSubtitle')}</Text>
-          
+
           {recordingUri ? (
             <View style={styles.audioContainer}>
               <View style={styles.audioPlayer}>
-                <TouchableOpacity 
-                  style={styles.playButton} 
+                <TouchableOpacity
+                  style={styles.playButton}
                   onPress={isPlaying ? stopPlayback : playRecording}
                 >
-                  <Ionicons 
-                    name={isPlaying ? "pause" : "play"} 
-                    size={24} 
-                    color="#FFFFFF" 
+                  <Ionicons
+                    name={isPlaying ? "pause" : "play"}
+                    size={24}
+                    color="#FFFFFF"
                   />
                 </TouchableOpacity>
                 <View style={styles.audioInfo}>
@@ -1015,16 +1074,16 @@ export default function Post() {
               </View>
             </View>
           ) : (
-            <TouchableOpacity 
-              style={[styles.audioRecordCard, isRecording && styles.recordingCard]} 
+            <TouchableOpacity
+              style={[styles.audioRecordCard, isRecording && styles.recordingCard]}
               onPress={isRecording ? stopRecording : startRecording}
               disabled={isRecording && recordingDuration >= 60}
             >
               <View style={styles.recordButton}>
-                <Ionicons 
-                  name={isRecording ? "stop" : "mic"} 
-                  size={32} 
-                  color={isRecording ? "#F44336" : "#666666"} 
+                <Ionicons
+                  name={isRecording ? "stop" : "mic"}
+                  size={32}
+                  color={isRecording ? "#F44336" : "#666666"}
                 />
               </View>
               <View style={styles.recordInfo}>
@@ -1095,11 +1154,11 @@ export default function Post() {
               </View>
             )}
           </TouchableOpacity>
-          
+
           {uploadProgress && isSubmitting && (
             <Text style={styles.progressText}>{uploadProgress}</Text>
           )}
-          
+
           <Text style={styles.submitNote}>
             {t('post.submitNote')}
           </Text>
@@ -1119,58 +1178,58 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  paddingHorizontal: 20,
-  paddingVertical: 16,
-  backgroundColor: '#FFFFFF',
-  borderBottomWidth: 1,
-  borderBottomColor: '#E0E0E0',
-  marginTop: 30,
-},
-headerTitle: {
-  fontSize: 20,
-  fontWeight: 'bold',
-  color: '#333',
-},
-offlineBanner: {
-  backgroundColor: '#FF6B35',
-  padding: 12,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginHorizontal: 20,
-  marginTop: 10,
-  borderRadius: 8,
-},
-offlineText: {
-  color: '#fff',
-  fontSize: 14,
-  fontWeight: '500',
-  flex: 1,
-  marginLeft: 8,
-},
-offlineCount: {
-  color: '#fff',
-  fontSize: 12,
-  fontWeight: 'bold',
-  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  paddingHorizontal: 8,
-  paddingVertical: 4,
-  borderRadius: 12,
-},
-manualUploadBanner: {
-  backgroundColor: '#4CAF50',
-  padding: 12,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  marginHorizontal: 20,
-  marginTop: 10,
-  borderRadius: 8,
-},
-section: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    marginTop: 30,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  offlineBanner: {
+    backgroundColor: '#FF6B35',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginTop: 10,
+    borderRadius: 8,
+  },
+  offlineText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    marginLeft: 8,
+  },
+  offlineCount: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  manualUploadBanner: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginHorizontal: 20,
+    marginTop: 10,
+    borderRadius: 8,
+  },
+  section: {
     padding: 20,
     backgroundColor: '#FFFFFF',
     marginTop: 12,
@@ -1234,71 +1293,71 @@ section: {
     minHeight: 100,
   },
   dropdownButton: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  backgroundColor: '#FFFFFF',
-  borderWidth: 2,
-  borderColor: '#D0D0D0',
-  borderRadius: 12,
-  padding: 18,
-  shadowColor: '#000',
-  shadowOffset: {
-    width: 0,
-    height: 2,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#D0D0D0',
+    borderRadius: 12,
+    padding: 18,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  shadowOpacity: 0.1,
-  shadowRadius: 3.84,
-  elevation: 5,
-},
-dropdownText: {
-  fontSize: 16,
-  color: '#333',
-  fontWeight: '600',
-},
-dropdownList: {
-  backgroundColor: '#FFFFFF',
-  borderWidth: 2,
-  borderColor: '#D0D0D0',
-  borderRadius: 12,
-  marginTop: 8,
-  shadowColor: '#000',
-  shadowOffset: {
-    width: 0,
-    height: 2,
+  dropdownText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '600',
   },
-  shadowOpacity: 0.1,
-  shadowRadius: 3.84,
-  elevation: 5,
-},
-dropdownItem: {
-  flexDirection: 'row',
-  alignItems: 'flex-start',
-  padding: 18,
-  borderBottomWidth: 1,
-  borderBottomColor: '#E8E8E8',
-  backgroundColor: '#FAFAFA',
-  marginHorizontal: 4,
-  marginVertical: 2,
-  borderRadius: 8,
-},
-dropdownItemText: {
-  fontSize: 16,
-  marginLeft: 12,
-  color: '#222',
-  fontWeight: '700',
-},
-categoryTextContainer: {
-  flex: 1,
-  marginLeft: 12,
-},
-categoryDescription: {
-  fontSize: 12,
-  color: '#555',
-  marginTop: 3,
-  lineHeight: 16,
-  fontWeight: '500',
-},
+  dropdownList: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#D0D0D0',
+    borderRadius: 12,
+    marginTop: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 18,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E8E8',
+    backgroundColor: '#FAFAFA',
+    marginHorizontal: 4,
+    marginVertical: 2,
+    borderRadius: 8,
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    marginLeft: 12,
+    color: '#222',
+    fontWeight: '700',
+  },
+  categoryTextContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  categoryDescription: {
+    fontSize: 12,
+    color: '#555',
+    marginTop: 3,
+    lineHeight: 16,
+    fontWeight: '500',
+  },
 
   charCount: {
     fontSize: 12,
@@ -1439,7 +1498,7 @@ categoryDescription: {
     marginTop: 16,
     lineHeight: 20,
   },
-  
+
   // Audio Recording Styles
   audioContainer: {
     marginTop: 12,
@@ -1521,7 +1580,7 @@ categoryDescription: {
     color: '#999999',
     fontFamily: 'monospace',
   },
-  
+
   // Media Upload Styles
   mediaScrollView: {
     marginTop: 12,
