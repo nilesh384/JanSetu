@@ -10,6 +10,7 @@ import { Report } from '@/src/types/report';
 import { formatTimeAgo, parseServerDate } from '@/src/utils/date';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
+import notificationService from '@/src/services/notificationService';
 
 interface ExtendedReport extends Report {
   distance?: number;
@@ -134,8 +135,21 @@ export default function Home() {
     }
   };
 
+  const initializeNotifications = async () => {
+    try {
+      const token = await notificationService.initialize();
+      if (token && user) {
+        // Update token for the current user
+        await notificationService.updateTokenForUser(user.id);
+      }
+    } catch (error) {
+      console.error('Error initializing notifications:', error);
+    }
+  };
+
   useEffect(() => {
     getUserLocation();
+    initializeNotifications();
   }, []);
 
   useEffect(() => {

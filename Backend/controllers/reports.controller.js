@@ -1,6 +1,7 @@
 import { query, queryOne, transaction } from "../db/utils.js";
 import { uploadOnCloudinary } from "../services/cloudinary.js";
 import redisService from "../services/redis.js";
+import { sendReportResolvedNotification } from "../services/notificationService.js";
 
 // Helper to convert DB timestamp values to ISO strings (null-safe)
 const toISO = (val) => (val ? new Date(val).toISOString() : null);
@@ -867,6 +868,15 @@ const resolveReport = async (req, res) => {
                 WHERE id = $1
             `;
             await client.query(updateUserQuery, [resolved.user_id]);
+
+            // Send notification to user about report resolution
+            try {
+                await sendReportResolvedNotification(resolved.user_id, resolved.id, resolved.title || 'Your Report');
+                console.log('✅ Notification sent to user for resolved report:', reportId);
+            } catch (notificationError) {
+                console.error('⚠️ Failed to send notification, but report was resolved:', notificationError);
+                // Don't fail the entire operation if notification fails
+            }
 
             return { resolved, uploadedPhotosCount: resolvedMediaUrls.length };
         });
