@@ -11,6 +11,7 @@ import {
   Alert,
   SafeAreaView,
 } from 'react-native';
+import { getReportById } from '@/src/api/report';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
@@ -59,8 +60,13 @@ export default function ReportDetails() {
   const params = useLocalSearchParams();
   const router = useRouter();
   
-  // Parse the report data from params
-  const report: Report = params.report ? JSON.parse(params.report as string) : null;
+  // Parse the report data from params or prepare to fetch by ID
+  const initialReport: Report | null = params.report ? JSON.parse(params.report as string) : null;
+  const reportId = params.id as string;
+  
+  // State for report data
+  const [report, setReport] = useState<Report | null>(initialReport);
+  const [loading, setLoading] = useState(!initialReport && !!reportId);
 
   // State for media viewing
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -78,6 +84,38 @@ export default function ReportDetails() {
   const [showVideoPlayer, setShowVideoPlayer] = useState(false);
   const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
   const [videoLoading, setVideoLoading] = useState(false);
+
+  // Fetch report by ID if not passed as params
+  const fetchReportById = async (id: string) => {
+    try {
+      setLoading(true);
+      console.log('🔄 Fetching fresh report data for ID:', id);
+      
+      const response = await getReportById(id) as { success: boolean; report?: Report; message?: string };
+      
+      if (response.success && response.report) {
+        setReport(response.report);
+        console.log('✅ Fresh report data loaded');
+      } else {
+        console.error('❌ Failed to fetch report:', response.message);
+        Alert.alert('Error', 'Report not found or has been removed');
+        router.back();
+      }
+    } catch (error) {
+      console.error('❌ Error fetching report:', error);
+      Alert.alert('Error', 'Failed to load report details');
+      router.back();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Effect to fetch report if ID is provided but no report data
+  useEffect(() => {
+    if (reportId && !initialReport) {
+      fetchReportById(reportId);
+    }
+  }, [reportId, initialReport]);
   const [videoStatus, setVideoStatus] = useState<any>(null);
 
   // Zoom and pan for images
@@ -276,12 +314,25 @@ export default function ReportDetails() {
     };
   }, [sound]);
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <UniversalHeader title="Report Details" showBackButton={true} />
+        <View style={styles.errorContainer}>
+          <ActivityIndicator size="large" color="#FF6B35" />
+          <Text style={styles.loadingText}>Loading report details...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!report) {
     return (
       <SafeAreaView style={styles.container}>
         <UniversalHeader title="Report Details" showBackButton={true} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Report not found</Text>
+          <Text style={styles.errorSubText}>This report may have been removed or doesn't exist</Text>
         </View>
       </SafeAreaView>
     );
@@ -808,10 +859,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorSubText: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+  },
+  loadingText: {
     fontSize: 16,
     color: '#666666',
+    marginTop: 12,
+    textAlign: 'center',
   },
   reportHeader: {
     flexDirection: 'row',

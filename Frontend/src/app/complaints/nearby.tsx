@@ -144,7 +144,7 @@ export default function NearbyComplaints() {
         setLoading(true);
       }
 
-      const response = await getNearbyReports(userLocation, 10) as ApiResponse; // Pass location object and 10km radius
+      const response = await getNearbyReports(userLocation, 10, { page: 1, limit: 10, category: '', priority: '' }) as ApiResponse; // Pass location and required params
 
       if (response && response.success && response.reports) {
         // Calculate distances and add to reports

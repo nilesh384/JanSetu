@@ -1,11 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://81cq2mbl-4000.inc1.devtunnels.ms'; // Replace with your backend URL
+const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'https://melba-ahistorical-alexa.ngrok-free.dev'}/api/v1`;
 
 // Save FCM token to server
 export const saveFCMToken = async (fcmToken, platform) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/fcm-token`, {
+    const response = await fetch(`${API_BASE_URL}/notifications/users/fcm-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,7 +27,7 @@ export const saveFCMToken = async (fcmToken, platform) => {
 // Update FCM token for a specific user
 export const updateUserFCMToken = async (userId, fcmToken, platform) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/users/update-fcm-token`, {
+    const response = await fetch(`${API_BASE_URL}/notifications/users/update-fcm-token`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',

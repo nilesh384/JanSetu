@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { getNearbyReports, getCommunityStats } from '@/src/api/report';
 import { useAuth } from '@/src/context/AuthContext';
@@ -150,6 +151,15 @@ export default function Home() {
   useEffect(() => {
     getUserLocation();
     initializeNotifications();
+    
+    // Multiple retry attempts for pending navigation
+    const timers = [
+      setTimeout(() => notificationService.retryPendingNavigation(), 2000),
+      setTimeout(() => notificationService.forceNavigationIfPending(), 4000),
+      setTimeout(() => notificationService.retryPendingNavigation(), 6000),
+    ];
+    
+    return () => timers.forEach(timer => clearTimeout(timer));
   }, []);
 
   useEffect(() => {
@@ -161,6 +171,18 @@ export default function Home() {
   useEffect(() => {
     fetchCommunityStats();
   }, []);
+
+  // Handle navigation when screen comes into focus (from push notifications)
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('🏠 Home screen focused, checking for pending navigation...');
+      
+      // Force check for pending navigation when screen is focused
+      setTimeout(() => {
+        notificationService.forceNavigationIfPending();
+      }, 1000);
+    }, [])
+  );
 
   return (
     <SafeAreaView style={styles.container}>

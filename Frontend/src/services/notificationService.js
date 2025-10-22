@@ -1,5 +1,5 @@
 import messaging from '@react-native-firebase/messaging';
-import { Alert, Platform } from 'react-native';
+import { Alert, Platform, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { saveFCMToken, updateUserFCMToken } from '../api/notifications';
 import { router } from 'expo-router';
@@ -7,6 +7,8 @@ import { router } from 'expo-router';
 class NotificationService {
   constructor() {
     this.fcmToken = null;
+    this.pendingNavigation = null;
+    this.navigationQueue = [];
   }
 
   // Request permission and get FCM token
@@ -93,10 +95,25 @@ class NotificationService {
 
     // Handle notification opened app
     messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log('Notification caused app to open from background state:', remoteMessage);
+      console.log('🔔 Push notification opened app from background:', remoteMessage);
+      console.log('📊 Notification data:', remoteMessage.data);
       
-      if (remoteMessage.data) {
-        this.handleNotificationData(remoteMessage.data);
+      if (remoteMessage.data && remoteMessage.data.reportId) {
+        // Create deep link URL
+        const deepLinkUrl = `jansetu://reportDetails?id=${remoteMessage.data.reportId}&t=${Date.now()}`;
+        console.log('🔗 Opening deep link from background:', deepLinkUrl);
+        
+        // Use Linking to open the deep link
+        setTimeout(async () => {
+          try {
+            await Linking.openURL(deepLinkUrl);
+            console.log('✅ Deep link opened successfully from background');
+          } catch (error) {
+            console.error('❌ Deep link failed from background:', error);
+            // Fallback to notification handler
+            this.handleNotificationData(remoteMessage.data);
+          }
+        }, 500);
       }
     });
 
@@ -105,10 +122,32 @@ class NotificationService {
       .getInitialNotification()
       .then(remoteMessage => {
         if (remoteMessage) {
-          console.log('Notification caused app to open from quit state:', remoteMessage);
+          console.log('🔔 Push notification opened app from quit state:', remoteMessage);
+          console.log('📊 Initial notification data:', remoteMessage.data);
           
-          if (remoteMessage.data) {
-            this.handleNotificationData(remoteMessage.data);
+          if (remoteMessage.data && remoteMessage.data.reportId) {
+            // Create deep link URL for initial notification
+            const deepLinkUrl = `jansetu://reportDetails?id=${remoteMessage.data.reportId}&t=${Date.now()}`;
+            console.log('🔗 Opening deep link from quit state:', deepLinkUrl);
+            
+            // Store for processing after app initialization
+            this.storeNotificationData({
+              ...remoteMessage.data,
+              deepLinkUrl,
+              source: 'initial_notification'
+            });
+            
+            // Use Linking to open the deep link with longer delay
+            setTimeout(async () => {
+              try {
+                await Linking.openURL(deepLinkUrl);
+                console.log('✅ Deep link opened successfully from quit state');
+              } catch (error) {
+                console.error('❌ Deep link failed from quit state:', error);
+                // Fallback to notification handler
+                this.handleNotificationData(remoteMessage.data);
+              }
+            }, 2000);
           }
         }
       });
@@ -122,27 +161,167 @@ class NotificationService {
     });
   }
 
-  // Handle notification data and navigate accordingly
+  // Handle notification data using deep linking approach
   handleNotificationData(data) {
-    console.log('Handling notification data:', data);
+    console.log('📱 Handling notification data with deep linking:', data);
+    
+    // Store in AsyncStorage for app restart scenarios
+    this.storeNotificationData(data);
     
     // Handle different notification types
     switch (data.type) {
       case 'report_resolved':
-        // Navigate to report details
-        console.log('Report resolved notification:', data.reportId);
-        if (data.reportId) {
-          router.push(`/reportDetails?id=${data.reportId}`);
-        }
-        break;
       case 'report_update':
-        console.log('Report update notification:', data.reportId);
+        console.log(`📱 ${data.type} notification for report:`, data.reportId);
         if (data.reportId) {
-          router.push(`/reportDetails?id=${data.reportId}`);
+          this.navigateUsingDeepLink(data.reportId);
         }
         break;
       default:
-        console.log('Unknown notification type:', data.type);
+        console.log('❓ Unknown notification type:', data.type);
+    }
+  }
+
+  // Store notification data for later processing
+  async storeNotificationData(data) {
+    try {
+      await AsyncStorage.setItem('lastNotificationData', JSON.stringify({
+        ...data,
+        timestamp: Date.now(),
+        processed: false
+      }));
+      console.log('💾 Notification data stored for processing');
+    } catch (error) {
+      console.error('❌ Error storing notification data:', error);
+    }
+  }
+
+  // Navigate using deep linking
+  async navigateUsingDeepLink(reportId) {
+    console.log('🔗 Attempting deep link navigation to report:', reportId);
+    
+    const timestamp = Date.now();
+    const deepLinkUrl = `jansetu://reportDetails?id=${reportId}&t=${timestamp}`;
+    
+    try {
+      console.log('🔗 Opening deep link:', deepLinkUrl);
+      
+      // Always try to open the deep link
+      await Linking.openURL(deepLinkUrl);
+      console.log('✅ Deep link navigation successful');
+      
+      // Mark as processed
+      await AsyncStorage.setItem('lastNotificationData', JSON.stringify({
+        reportId,
+        timestamp,
+        processed: true
+      }));
+      
+    } catch (error) {
+      console.warn('⚠️ Deep link failed, trying router fallback:', error);
+      
+      // Method 2: Fallback to router navigation with delay
+      this.fallbackRouterNavigation(reportId, timestamp);
+    }
+  }
+
+  // Fallback router navigation
+  fallbackRouterNavigation(reportId, timestamp) {
+    console.log('🔄 Using router fallback navigation');
+    
+    // Use multiple delays to handle different app states
+    const delays = [500, 1500, 3000];
+    
+    delays.forEach((delay, index) => {
+      setTimeout(() => {
+        console.log(`🔄 Router attempt ${index + 1} after ${delay}ms delay`);
+        this.attemptRouterNavigation(reportId, timestamp);
+      }, delay);
+    });
+  }
+
+  // Attempt router navigation
+  attemptRouterNavigation(reportId, timestamp) {
+    if (!router) {
+      console.warn('⚠️ Router not available yet');
+      return;
+    }
+
+    try {
+      // Try the most reliable method first
+      router.push({
+        pathname: '/reportDetails',
+        params: { id: reportId, t: timestamp }
+      });
+      console.log('✅ Router navigation successful');
+      
+      // Mark as processed
+      AsyncStorage.setItem('lastNotificationData', JSON.stringify({
+        reportId,
+        timestamp,
+        processed: true
+      }));
+      
+    } catch (error) {
+      console.error('❌ Router navigation failed:', error);
+      
+      // Store for retry when app is ready
+      this.navigationQueue.push({ reportId, timestamp });
+    }
+  }
+
+  // Process any pending notifications (call this when app is fully loaded)
+  async processPendingNotifications() {
+    try {
+      const stored = await AsyncStorage.getItem('lastNotificationData');
+      if (stored) {
+        const data = JSON.parse(stored);
+        if (!data.processed && Date.now() - data.timestamp < 300000) { // 5 minutes
+          console.log('� Processing pending notification:', data);
+          
+          if (data.reportId) {
+            this.attemptRouterNavigation(data.reportId, Date.now());
+          }
+        }
+      }
+      
+      // Process navigation queue
+      while (this.navigationQueue.length > 0) {
+        const item = this.navigationQueue.shift();
+        console.log('� Processing queued navigation:', item);
+        this.attemptRouterNavigation(item.reportId, item.timestamp);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error processing pending notifications:', error);
+    }
+  }
+
+  // Method to retry pending navigation (call this when app is fully loaded)
+  retryPendingNavigation() {
+    if (this.pendingNavigation && Date.now() - this.pendingNavigation.timestamp < 60000) {
+      const { reportId, retryCount = 0, source } = this.pendingNavigation;
+      
+      if (retryCount < 5) {
+        console.log(`🔄 Retrying pending navigation (attempt ${retryCount + 1}):`, reportId);
+        console.log(`📍 Original source: ${source || 'unknown'}`);
+        
+        this.handleNotificationData({ 
+          type: 'report_resolved', 
+          reportId: reportId 
+        });
+      } else {
+        console.warn('⚠️ Max retry attempts reached for notification navigation');
+        this.pendingNavigation = null;
+      }
+    }
+  }
+
+  // Method to force navigation (call from Home screen when fully loaded)
+  forceNavigationIfPending() {
+    if (this.pendingNavigation) {
+      console.log('🎯 Forcing navigation from Home screen load');
+      this.retryPendingNavigation();
     }
   }
 
