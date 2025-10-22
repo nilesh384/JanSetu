@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
-    "scheme": "JanSetu",
+    "scheme": "jansetu",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -17,7 +17,8 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.nilesh.JanSetu"
+      "package": "com.nilesh.jansetu",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "bundler": "metro",
@@ -26,6 +27,8 @@
     },
     "plugins": [
       "expo-router",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       [
         "expo-splash-screen",
         {
@@ -42,7 +45,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "843097ae-52d5-46fd-bb90-3a2e883bef4e"
+        "projectId": "d96f6c23-82fe-48ab-8c51-37de1b7d0e4a"
       }
     }
   }
