@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1005007930339",
+    "project_id": "jansetu-07",
+    "storage_bucket": "jansetu-07.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1005007930339:android:c3c225437c42c9648cd6d6",
+        "android_client_info": {
+          "package_name": "com.nilesh.jansetu"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEfXNxDwxNTdux9Pzm0dpk8qCFdhXbvXM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
