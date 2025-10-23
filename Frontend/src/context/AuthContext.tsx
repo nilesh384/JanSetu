@@ -4,6 +4,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { getUserById } from '../api/user.js';
 import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import notificationService from '../services/notificationService';
 
 // Types for TypeScript - Updated to match database schema
 interface User {
@@ -168,6 +169,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUser(userData);
       setRequiresProfileSetup(profileSetupRequired);
+      
+      // Update FCM token for the logged-in user
+      try {
+        await notificationService.updateTokenForUser(userData.id);
+      } catch (notifError) {
+        console.warn('⚠️ Failed to update FCM token:', notifError);
+        // Don't fail login if FCM token update fails
+      }
+      
       console.log('✅ User logged in successfully:', userData.id);
       
     } catch (error) {
