@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { uploadReportMedia } from '../api/media';
 
 const OFFLINE_REPORTS_KEY = '@crowdsource_offline_reports';
 
@@ -149,9 +150,6 @@ class OfflineStorage {
 
       if (report.mediaItems && report.mediaItems.length > 0) {
         console.log('📁 Re-uploading media files for offline report...');
-        
-        // Import the media upload function
-        const { uploadReportMedia } = await import('../api/media');
         
         try {
           const uploadResult = await uploadReportMedia(report.mediaItems, report.recordingUri || undefined, report.userId);

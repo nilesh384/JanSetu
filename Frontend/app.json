@@ -30,6 +30,13 @@
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow JanSetu to use Face ID for secure access.",
+          "biometricPermission": "Allow JanSetu to use fingerprint for secure access."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/logo.png",

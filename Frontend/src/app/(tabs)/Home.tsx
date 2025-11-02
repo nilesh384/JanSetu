@@ -12,6 +12,8 @@ import { formatTimeAgo, parseServerDate } from '@/src/utils/date';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
 import notificationService from '@/src/services/notificationService';
+import BiometricOnboarding from '@/src/components/BiometricOnboarding';
+import { useBiometricOnboarding } from '@/src/utils/useBiometricOnboarding';
 
 interface ExtendedReport extends Report {
   distance?: number;
@@ -31,6 +33,12 @@ interface CommunityStatsResponse {
 export default function Home() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { 
+    shouldShowOnboarding, 
+    biometricType, 
+    markOnboardingAsShown 
+  } = useBiometricOnboarding();
+  
   const [nearbyReports, setNearbyReports] = useState<ExtendedReport[]>([]);
   const [loading, setLoading] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -352,6 +360,13 @@ export default function Home() {
           </View>
         </View>
       </ScrollView>
+      
+      {/* Biometric Onboarding Modal */}
+      <BiometricOnboarding
+        visible={shouldShowOnboarding}
+        onComplete={markOnboardingAsShown}
+        biometricType={biometricType}
+      />
     </SafeAreaView>
   );
 }

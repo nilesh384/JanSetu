@@ -193,6 +193,14 @@ export default function Profile() {
       iconType: 'Ionicons',
       onPress: () => router.push('/profileSettings/personal'),
     },
+    {
+      id: 'biometric',
+      title: 'Biometric Security',
+      subtitle: 'Manage fingerprint and face recognition',
+      icon: 'finger-print-outline',
+      iconType: 'Ionicons',
+      onPress: () => router.push('/profileSettings/biometric'),
+    },
     // {
     //   id: 'notifications',
     //   title: 'Notifications',
