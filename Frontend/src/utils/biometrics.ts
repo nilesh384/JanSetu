@@ -12,6 +12,9 @@ export interface BiometricAuthResult {
   error?: string;
 }
 
+// Global flag to prevent concurrent biometric prompts
+let isBiometricPromptInProgress = false;
+
 export const checkBiometricSupport = async (): Promise<BiometricSupport> => {
   try {
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -38,6 +41,14 @@ export const checkBiometricSupport = async (): Promise<BiometricSupport> => {
 export const promptBiometricAuth = async (
   reason: string = 'Authenticate to access JanSetu'
 ): Promise<BiometricAuthResult> => {
+  // Prevent concurrent biometric prompts
+  if (isBiometricPromptInProgress) {
+    console.log('⚠️ Biometric prompt already in progress, ignoring duplicate request');
+    return { success: false, error: 'Biometric prompt already in progress' };
+  }
+
+  isBiometricPromptInProgress = true;
+
   try {
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage: reason,
@@ -56,6 +67,9 @@ export const promptBiometricAuth = async (
       success: false, 
       error: error instanceof Error ? error.message : 'Authentication failed'
     };
+  } finally {
+    // Always reset the flag after authentication attempt
+    isBiometricPromptInProgress = false;
   }
 };
 
@@ -84,4 +98,10 @@ export const isDeviceSecure = async (): Promise<boolean> => {
     console.error('Error checking device security:', error);
     return false;
   }
+};
+
+// Utility function to reset biometric prompt state (for debugging purposes)
+export const resetBiometricPromptState = (): void => {
+  isBiometricPromptInProgress = false;
+  console.log('🔄 Biometric prompt state reset');
 };

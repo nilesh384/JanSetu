@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { getUserById } from '../api/user.js';
@@ -59,12 +59,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [hasNetworkError, setHasNetworkError] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricSupported, setBiometricSupported] = useState(false);
+  const [isBiometricPromptActive, setIsBiometricPromptActive] = useState(false);
+  
+  // Ref to track if auth check has been initiated
+  const hasInitiatedAuthCheck = useRef(false);
 
   // Check if user is authenticated
   const isAuthenticated = !!user;
 
   // Check authentication status on app startup
   const checkAuthStatus = async () => {
+    // Prevent multiple concurrent authentication checks
+    if (hasInitiatedAuthCheck.current || isBiometricPromptActive) {
+      console.log('🔐 Auth check already in progress, skipping...');
+      return;
+    }
+
+    hasInitiatedAuthCheck.current = true;
+
     try {
       setIsLoading(true);
       setHasNetworkError(false);
@@ -95,21 +107,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // If biometrics are enabled, prompt for authentication
           if (isBiometricEnabled) {
             console.log('🔐 Prompting for biometric authentication to unlock app...');
-            const authResult = await promptBiometricAuth('Unlock JanSetu');
+            setIsBiometricPromptActive(true);
             
-            if (authResult.success) {
-              console.log('✅ Biometric authentication successful');
-              setUser(userData);
+            try {
+              const authResult = await promptBiometricAuth('Unlock JanSetu');
               
-              // Check if profile setup is required
-              const needsProfileSetup = !userData.fullName || !userData.email;
-              setRequiresProfileSetup(needsProfileSetup);
-              
-              // Optionally refresh user data in background
-              refreshUserInBackground(userData.id);
-            } else {
-              console.log('❌ Biometric authentication failed, clearing session');
-              await clearAuthStorage();
+              if (authResult.success) {
+                console.log('✅ Biometric authentication successful');
+                setUser(userData);
+                
+                // Check if profile setup is required
+                const needsProfileSetup = !userData.fullName || !userData.email;
+                setRequiresProfileSetup(needsProfileSetup);
+                
+                // Optionally refresh user data in background
+                refreshUserInBackground(userData.id);
+              } else {
+                console.log('❌ Biometric authentication failed, clearing session');
+                await clearAuthStorage();
+              }
+            } finally {
+              setIsBiometricPromptActive(false);
             }
           } else {
             // No biometrics, proceed with normal session restoration
@@ -133,16 +151,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // No stored session, check for auto-login with biometrics
         const lastLoggedUser = await AsyncStorage.getItem(STORAGE_KEYS.LAST_LOGGED_USER);
         
-        if (lastLoggedUser && isBiometricEnabled) {
+        if (lastLoggedUser && isBiometricEnabled && !isBiometricPromptActive) {
           console.log('🔐 Attempting auto-login with biometrics...');
-          const authResult = await promptBiometricAuth('Sign in to JanSetu');
+          setIsBiometricPromptActive(true);
           
-          if (authResult.success) {
-            console.log('✅ Auto-login with biometrics successful');
-            const userData = JSON.parse(lastLoggedUser);
-            await performAutoLogin(userData);
-          } else {
-            console.log('❌ Auto-login with biometrics failed');
+          try {
+            const authResult = await promptBiometricAuth('Sign in to JanSetu');
+            
+            if (authResult.success) {
+              console.log('✅ Auto-login with biometrics successful');
+              const userData = JSON.parse(lastLoggedUser);
+              await performAutoLogin(userData);
+            } else {
+              console.log('❌ Auto-login with biometrics failed');
+            }
+          } finally {
+            setIsBiometricPromptActive(false);
           }
         } else {
           console.log('🔐 No stored authentication found');
@@ -154,6 +178,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await clearAuthStorage();
     } finally {
       setIsLoading(false);
+      // Reset the flag after completion
+      hasInitiatedAuthCheck.current = false;
     }
   };
 
@@ -290,6 +316,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await clearAuthStorage();
       setUser(null);
       setRequiresProfileSetup(false);
+      setIsBiometricPromptActive(false);
+      hasInitiatedAuthCheck.current = false; // Reset auth check flag
       console.log('✅ User logged out successfully');
     } catch (error) {
       console.error('❌ Error during logout:', error);
@@ -348,10 +376,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
       }
 
-      const authResult = await promptBiometricAuth(reason || 'Authenticate to continue');
-      return authResult.success;
+      // Prevent concurrent biometric prompts
+      if (isBiometricPromptActive) {
+        console.log('❌ Biometric prompt already active');
+        return false;
+      }
+
+      setIsBiometricPromptActive(true);
+      
+      try {
+        const authResult = await promptBiometricAuth(reason || 'Authenticate to continue');
+        return authResult.success;
+      } finally {
+        setIsBiometricPromptActive(false);
+      }
     } catch (error) {
       console.error('❌ Biometric authentication error:', error);
+      setIsBiometricPromptActive(false);
       return false;
     }
   };

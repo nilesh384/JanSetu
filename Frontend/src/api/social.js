@@ -1,17 +1,10 @@
-import { Platform } from 'react-native';
 import axios from 'axios';
 
 // API Base URL - Using ngrok tunnel
 const getBaseURL = () => {
-  if (__DEV__) {
-    // Development mode - using ngrok tunnel
-    const tunnelUrl = process.env.EXPO_PUBLIC_API_URL || 'https://melba-ahistorical-alexa.ngrok-free.dev';
-    return `${tunnelUrl}/api/v1`;
-  } else {
-    // Production mode
-    return 'https://your-production-api.com/api/v1';
-  }
-};
+  // Use environment variable for API URL
+  return `${process.env.EXPO_PUBLIC_API_URL}/api/v1`;
+}
 
 const API_BASE_URL = getBaseURL();
 

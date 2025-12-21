@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL || 'https://melba-ahistorical-alexa.ngrok-free.dev'}/api/v1`;
+const API_BASE_URL = `${process.env.EXPO_PUBLIC_API_URL}/api/v1`;
 
 // Save FCM token to server
 export const saveFCMToken = async (fcmToken, platform) => {

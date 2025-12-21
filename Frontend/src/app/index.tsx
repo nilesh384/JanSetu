@@ -4,14 +4,11 @@ import { View, ActivityIndicator, StyleSheet } from "react-native";
 import { useAuth } from "../context/AuthContext";
 
 export default function Index() {
-  const { isLoading, isAuthenticated, requiresProfileSetup, checkAuthStatus } = useAuth();
+  const { isLoading, isAuthenticated, requiresProfileSetup } = useAuth();
 
   useEffect(() => {
-    const initializeApp = async () => {
-      // Wait for auth check to complete
-      await checkAuthStatus();
-      
-      // Navigate based on authentication status
+    const initializeApp = () => {
+      // Navigate based on authentication status (don't call checkAuthStatus again)
       const timer = setTimeout(() => {
         if (isAuthenticated) {
           if (requiresProfileSetup) {
