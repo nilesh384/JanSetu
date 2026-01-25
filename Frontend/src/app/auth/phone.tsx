@@ -1,131 +1,102 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   StyleSheet,
   SafeAreaView,
   Alert,
   StatusBar,
-  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { sendOTP } from '../../api/otp.js';
+import PhoneEmailAuth from '../../components/PhoneEmailAuth';
+import { useAuth } from '../../context/AuthContext';
 
 export default function PhoneInput() {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { login } = useAuth();
 
-  const handlePhoneNumberChange = (text: string) => {
-    // Only allow digits and limit to 10 characters
-    const numericText = text.replace(/[^0-9]/g, '');
-    if (numericText.length <= 10) {
-      setPhoneNumber(numericText);
-    }
-  };
-
-  const handleProceed = async () => {
-    if (phoneNumber.length !== 10) {
-      Alert.alert('Invalid Phone Number', 'Please enter a 10-digit phone number');
-      return;
-    }
-    
-    setLoading(true);
-    
+  const handlePhoneEmailSuccess = async (authData: any) => {
     try {
-      // Send OTP to the backend (add +91 country code)
-      const fullPhoneNumber = `+91${phoneNumber}`;
-      const result = await sendOTP(fullPhoneNumber) as any;
+      console.log('✅ Phone.email auth successful');
       
-      if (result.success) {
-        // Show success message
-        router.push({
-                  pathname: '/auth/otp' as any,
-                  params: { phoneNumber: fullPhoneNumber }
-                });
+      // Login the user with the returned user data
+      await login(authData.user, authData.requiresProfileSetup);
+      
+      // Navigate based on account status
+      if (authData.requiresProfileSetup) {
+        console.log('🆕 New user - redirecting to profile setup');
+        router.replace('/auth/profile-setup' as any);
       } else {
-        // Show error message
-        Alert.alert('Error', result.message || 'Failed to send OTP. Please try again.');
+        console.log('✅ Existing user - redirecting to home');
+        router.replace('/(tabs)/Home' as any);
       }
     } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please check your internet connection and try again.');
-    } finally {
-      setLoading(false);
+      console.error('❌ Login error:', error);
+      Alert.alert('Error', 'Failed to login. Please try again.');
     }
   };
-
-  const isValidPhoneNumber = phoneNumber.length === 10;
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <StatusBar barStyle="light-content" backgroundColor="#FF6B35" />
+      
       <View style={styles.content}>
-        {/* Header with app branding */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Text style={styles.appName}>CrowdSource</Text>
+        {/* Header Section with Gradient Background */}
+        <View style={styles.headerSection}>
+          <View style={styles.iconContainer}>
+            <Ionicons name="shield-checkmark" size={80} color="#FFFFFF" />
           </View>
+          <Text style={styles.appName}>JanSetu</Text>
+          <Text style={styles.tagline}>Empowering Citizens Together</Text>
         </View>
 
-        {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={styles.subtitle}>
-            Enter your phone number to continue
-          </Text>
-        </View>
-
-        {/* Phone Input */}
-        <View style={styles.inputSection}>
-          <View style={styles.phoneInputContainer}>
-            <View style={styles.countryCodeContainer}>
-              <Ionicons name="flag" size={20} color="#FF6B35" />
-              <Text style={styles.countryCode}>+91</Text>
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          <View style={styles.welcomeCard}>
+            <Text style={styles.welcomeTitle}>Welcome! 👋</Text>
+            <Text style={styles.welcomeSubtitle}>
+              Sign in securely with your phone number
+            </Text>
+            
+            {/* Features List */}
+            <View style={styles.featuresList}>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Text style={styles.featureText}>100% Free verification</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Text style={styles.featureText}>Secure & encrypted</Text>
+              </View>
+              <View style={styles.featureItem}>
+                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Text style={styles.featureText}>No charges or hidden fees</Text>
+              </View>
             </View>
-            <TextInput
-              style={styles.phoneInput}
-              value={phoneNumber}
-              onChangeText={handlePhoneNumberChange}
-              placeholder="Enter 10-digit number"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-              maxLength={10}
-              autoFocus
-            />
+
+            {/* Phone.email Authentication Button */}
+            <View style={styles.authButtonContainer}>
+              <PhoneEmailAuth 
+                onSuccess={handlePhoneEmailSuccess}
+                onError={(error) => Alert.alert('Error', error)}
+              />
+            </View>
           </View>
-        </View>
 
-        {/* Proceed Button */}
-        <TouchableOpacity
-          style={[
-            styles.proceedButton,
-            (isValidPhoneNumber && !loading) ? styles.proceedButtonActive : styles.proceedButtonInactive
-          ]}
-          onPress={handleProceed}
-          disabled={!isValidPhoneNumber || loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <>
-              <Text style={[
-                styles.proceedButtonText,
-                (isValidPhoneNumber && !loading) ? styles.proceedButtonTextActive : styles.proceedButtonTextInactive
-              ]}>
-                {isValidPhoneNumber ? 'Send OTP' : 'Enter Phone Number'}
-              </Text>
-              {isValidPhoneNumber && (
-                <Ionicons name="arrow-forward" size={20} color="#FFFFFF" style={styles.buttonIcon} />
-              )}
-            </>
-          )}
-        </TouchableOpacity>
-
-        {/* Footer Info */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            By continuing, you agree to our Terms of Service and Privacy Policy
+          {/* Footer Info */}
+          <View style={styles.footer}>
+            <Ionicons name="lock-closed-outline" size={16} color="#6B7280" />
+            <Text style={styles.footerText}>
+              Your data is safe and secure with us
+            </Text>
+          </View>
+          
+          <Text style={styles.termsText}>
+            By continuing, you agree to our{' '}
+            <Text style={styles.linkText}>Terms of Service</Text>
+            {' '}and{' '}
+            <Text style={styles.linkText}>Privacy Policy</Text>
           </Text>
         </View>
       </View>
@@ -136,131 +107,107 @@ export default function PhoneInput() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FF6B35',
   },
   content: {
     flex: 1,
+  },
+  headerSection: {
+    backgroundColor: '#FF6B35',
+    paddingTop: 60,
+    paddingBottom: 40,
     paddingHorizontal: 24,
-  },
-  header: {
     alignItems: 'center',
-    paddingTop: 40,
-    paddingBottom: 20,
   },
-  logoContainer: {
+  iconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20,
   },
   appName: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
-    color: '#FF6B35',
-    marginTop: 12,
-    letterSpacing: -0.5,
-  },
-  appTagline: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  welcomeSection: {
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    color: '#FFFFFF',
     marginBottom: 8,
-    color: '#1F2937',
   },
-  subtitle: {
+  tagline: {
     fontSize: 16,
-    textAlign: 'center',
-    color: '#6B7280',
-    lineHeight: 22,
-  },
-  inputSection: {
-    paddingVertical: 20,
-  },
-  phoneInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E7EB',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 18,
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  countryCodeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: 12,
-    borderRightWidth: 1,
-    borderRightColor: '#E5E7EB',
-    marginRight: 12,
-  },
-  countryCode: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
-    marginLeft: 8,
-  },
-  phoneInput: {
-    flex: 1,
-    fontSize: 18,
-    color: '#1F2937',
+    color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '500',
   },
-  proceedButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 18,
-    borderRadius: 16,
-    marginTop: 30,
-    shadowColor: '#FF6B35',
+  mainContent: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+  },
+  welcomeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
   },
-  proceedButtonActive: {
-    backgroundColor: '#FF6B35',
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 8,
   },
-  proceedButtonInactive: {
-    backgroundColor: '#E5E7EB',
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 24,
+    lineHeight: 22,
   },
-  proceedButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
+  featuresList: {
+    marginBottom: 32,
   },
-  proceedButtonTextActive: {
-    color: '#FFFFFF',
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  proceedButtonTextInactive: {
-    color: '#9CA3AF',
+  featureText: {
+    fontSize: 15,
+    color: '#4B5563',
+    marginLeft: 12,
+    fontWeight: '500',
   },
-  buttonIcon: {
-    marginLeft: 8,
+  authButtonContainer: {
+    marginTop: 8,
   },
   footer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    paddingBottom: 30,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 32,
+    gap: 8,
   },
   footerText: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#6B7280',
+    fontWeight: '500',
+  },
+  termsText: {
+    fontSize: 12,
+    color: '#9CA3AF',
     textAlign: 'center',
+    marginTop: 16,
     lineHeight: 18,
-    paddingHorizontal: 20,
+    paddingBottom: 24,
+  },
+  linkText: {
+    color: '#FF6B35',
+    fontWeight: '600',
   },
 });
