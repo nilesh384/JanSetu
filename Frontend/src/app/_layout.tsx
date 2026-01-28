@@ -101,9 +101,10 @@ function RootLayoutContent() {
     };
   }, [router]);
 
-  // Hide chatbot on auth screens, index screen, and other non-app screens
+  // Hide chatbot on auth screens, index screen, chatbot screen, and other non-app screens
   const shouldShowChatbot = !pathname.includes('/auth/') && 
                            !pathname.includes('index') && 
+                           !pathname.includes('/chatbot') &&
                            !pathname.includes('../context/AuthContext.tsx') && 
                            !pathname.includes('../components/AuthWrapper.tsx');
 
@@ -118,6 +119,7 @@ function RootLayoutContent() {
           <Stack.Screen name="profileSettings" options={{ headerShown: false }} />
           <Stack.Screen name="reportDetails" options={{ headerShown: false }} />
           <Stack.Screen name="user-details" options={{ headerShown: false }} />
+          <Stack.Screen name="chatbot" options={{ headerShown: false }} />
         </Stack>
       </AuthWrapper>
       {shouldShowChatbot && <FloatingChatbot />}

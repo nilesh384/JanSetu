@@ -42,38 +42,44 @@ export default function PhoneInput() {
       <StatusBar barStyle="light-content" backgroundColor="#FF6B35" />
       
       <View style={styles.content}>
-        {/* Header Section with Gradient Background */}
+        {/* Enhanced Header Section */}
         <View style={styles.headerSection}>
-          <View style={styles.iconContainer}>
-            <Ionicons name="shield-checkmark" size={80} color="#FFFFFF" />
+          {/* Floating Background Elements */}
+          <View style={styles.floatingCircle1}>
+            <Ionicons name="people-outline" size={24} color="rgba(255,255,255,0.3)" />
           </View>
-          <Text style={styles.appName}>JanSetu</Text>
-          <Text style={styles.tagline}>Empowering Citizens Together</Text>
+          <View style={styles.floatingCircle2}>
+            <Ionicons name="megaphone-outline" size={20} color="rgba(255,255,255,0.25)" />
+          </View>
+          <View style={styles.floatingCircle3}>
+            <Ionicons name="flag-outline" size={18} color="rgba(255,255,255,0.2)" />
+          </View>
+          
+          {/* Main Icon with Enhanced Design */}
+          <View style={styles.iconContainer}>
+            <View style={styles.iconGlow}>
+              <Image source={require('../../../assets/images/logo.png')} style={styles.icon} />
+            </View>
+          </View>
+          
+          {/* App Title with Better Typography */}
+          <View style={styles.titleContainer}>
+            <Text style={styles.appName}>JanSetu</Text>
+            <View style={styles.underline} />
+            <Text style={styles.tagline}>Empowering Citizens • Building Trust</Text>
+            <Text style={styles.subtitle}>Your Voice, Your Community</Text>
+          </View>
         </View>
 
         {/* Main Content */}
         <View style={styles.mainContent}>
           <View style={styles.welcomeCard}>
-            <Text style={styles.welcomeTitle}>Welcome! 👋</Text>
+            
             <Text style={styles.welcomeSubtitle}>
               Sign in securely with your phone number
             </Text>
             
-            {/* Features List */}
-            <View style={styles.featuresList}>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <Text style={styles.featureText}>100% Free verification</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <Text style={styles.featureText}>Secure & encrypted</Text>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
-                <Text style={styles.featureText}>No charges or hidden fees</Text>
-              </View>
-            </View>
+            
 
             {/* Phone.email Authentication Button */}
             <View style={styles.authButtonContainer}>
@@ -114,30 +120,108 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     backgroundColor: '#FF6B35',
-    paddingTop: 60,
-    paddingBottom: 40,
+    paddingTop: 70,
+    paddingBottom: 50,
     paddingHorizontal: 24,
+    alignItems: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  floatingCircle1: {
+    position: 'absolute',
+    top: 20,
+    right: 30,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  floatingCircle2: {
+    position: 'absolute',
+    top: 100,
+    left: 20,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  floatingCircle3: {
+    position: 'absolute',
+    bottom: 30,
+    right: 50,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   iconContainer: {
+    marginBottom: 24,
+    position: 'relative',
+  },
+  iconGlow: {
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  icon: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
+    resizeMode: 'contain',
+  },
+  titleContainer: {
     alignItems: 'center',
-    marginBottom: 20,
   },
   appName: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: 42,
+    fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 8,
+    letterSpacing: 1,
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+  underline: {
+    width: 60,
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.8)',
+    marginTop: 8,
+    marginBottom: 12,
+    borderRadius: 2,
   },
   tagline: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '500',
+    color: 'rgba(255, 255, 255, 0.95)',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '400',
+    fontStyle: 'italic',
+    textAlign: 'center',
   },
   mainContent: {
     flex: 1,

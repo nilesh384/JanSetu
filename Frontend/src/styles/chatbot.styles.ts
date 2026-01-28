@@ -77,23 +77,44 @@ export const styles = StyleSheet.create({
   timestamp: {
     fontSize: 12,
     marginTop: 6,
-    textAlign: 'right',
   },
   userTimestamp: {
     color: 'rgba(255, 255, 255, 0.7)',
-    textAlign: 'right',
   },
   aiTimestamp: {
     color: '#999',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 6,
+    gap: 4,
+  },
+  pendingIcon: {
+    marginLeft: 4,
+  },
+  loadingMessageContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  typingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#999',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    backgroundColor: '#f5f5f5',
     gap: 12,
   },
   textInput: {
@@ -106,9 +127,14 @@ export const styles = StyleSheet.create({
     marginRight: 0,
     maxHeight: 100,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'white',
     textAlignVertical: 'center',
     minHeight: 44,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 4,
   },
   sendButton: {
     width: 44,
@@ -124,7 +150,7 @@ export const styles = StyleSheet.create({
     elevation: 3,
   },
   sendButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#7198fd',
   },
   loadingContainer: {
     flex: 1,
@@ -196,5 +222,22 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     width: 36,
     height: 36,
+  },
+  simpleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  headerButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 40,
+    height: 40,
   },
 });
