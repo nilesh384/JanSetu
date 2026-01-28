@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { uploadReportMedia } from '../api/media';
+import { createReport } from '../api/report';
 
 const OFFLINE_REPORTS_KEY = '@crowdsource_offline_reports';
 
@@ -169,9 +170,6 @@ class OfflineStorage {
           throw new Error(`Media upload failed: ${mediaError.message}`);
         }
       }
-
-      // Import your existing report submission API
-      const { createReport } = await import('../api/report');
 
       // Prepare the report data for submission
       const reportData = {

@@ -181,6 +181,7 @@ export default function Home() {
   }, []);
 
   // Handle navigation when screen comes into focus (from push notifications)
+  // Also refresh community stats and nearby reports when returning to Home
   useFocusEffect(
     React.useCallback(() => {
       console.log('🏠 Home screen focused, checking for pending navigation...');
@@ -189,7 +190,15 @@ export default function Home() {
       setTimeout(() => {
         notificationService.forceNavigationIfPending();
       }, 1000);
-    }, [])
+
+      // Refresh community stats when screen comes into focus
+      fetchCommunityStats();
+      
+      // Refresh nearby reports if location is available
+      if (userLocation) {
+        fetchNearbyReports();
+      }
+    }, [userLocation])
   );
 
   return (

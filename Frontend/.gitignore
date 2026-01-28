@@ -38,5 +38,6 @@ yarn-error.*
 
 app-example
 .env
+.env.production
 
 google-services.json
