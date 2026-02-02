@@ -1,10 +1,115 @@
 import { AntDesign, Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { Tabs } from "expo-router";
-import { Platform, View } from "react-native";
+import { Platform, View, Animated } from "react-native";
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { router } from 'expo-router';
+
+const AnimatedTabIcon = ({ focused, icon, outlineIcon, color, inactiveColor }: any) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const translateYAnim = useRef(new Animated.Value(0)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: focused ? 1.1 : 1,
+        friction: 5,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateYAnim, {
+        toValue: focused ? -20 : 0,
+        friction: 6,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: focused ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused]);
+
+  return (
+    <Animated.View style={{
+      alignItems: "center",
+      justifyContent: "center",
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: focused ? "#FFF3E0" : "transparent",
+      transform: [{ scale: scaleAnim }, { translateY: translateYAnim }],
+      elevation: focused ? 8 : 0,
+      shadowColor: focused ? "#FF6B35" : "transparent",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: focused ? 0.3 : 0,
+      shadowRadius: 6,
+      borderWidth: focused ? 2 : 0,
+      borderColor: "#FFFFFF",
+    }}>
+      <Ionicons 
+        name={focused ? icon : outlineIcon}
+        size={24} 
+        color={focused ? color : inactiveColor} 
+      />
+    </Animated.View>
+  );
+};
+
+const AnimatedReportButton = ({ focused }: any) => {
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(scaleAnim, {
+      toValue: focused ? 1.1 : 1.0,
+      friction: 5,
+      tension: 100,
+      useNativeDriver: true,
+    }).start();
+
+    Animated.spring(rotateAnim, {
+      toValue: focused ? 1 : 0,
+      friction: 6,
+      tension: 80,
+      useNativeDriver: true,
+    }).start();
+  }, [focused]);
+
+  const rotation = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '90deg'],
+  });
+
+  return (
+    <Animated.View style={{
+      alignItems: "center",
+      justifyContent: "center",
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: focused ? "#FF6B35" : "#FF8C5A",
+      marginBottom: 32,
+      elevation: focused ? 24 : 16,
+      shadowColor: "#FF6B35",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.45,
+      shadowRadius: 12,
+      transform: [{ scale: scaleAnim }, { rotate: rotation }],
+      borderWidth: 5,
+      borderColor: "#FFFFFF",
+    }}>
+      <Ionicons 
+        name="add" 
+        size={28} 
+        color="#FFFFFF" 
+      />
+    </Animated.View>
+  );
+};
 
 export default function RootLayout() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -26,41 +131,51 @@ export default function RootLayout() {
       <Tabs
         initialRouteName="Home"
         screenOptions={{
-          tabBarActiveTintColor: "#FF6B35", // Saffron orange
-          tabBarInactiveTintColor: "#666666",
+          tabBarActiveTintColor: "#FF6B35",
+          tabBarInactiveTintColor: "#9CA3AF",
           tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: "700",
-            marginTop: 2,
-            marginBottom: Platform.OS === "ios" ? 0 : 4,
+            fontSize: 11,
+            fontWeight: "600",
+            marginTop: 4,
+            marginBottom: Platform.OS === "ios" ? 0 : 6,
             fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
           },
           tabBarItemStyle: {
-            paddingTop: 8,
-            paddingBottom: Platform.OS === "ios" ? 0 : 4,
+            paddingTop: 6,
+            paddingBottom: Platform.OS === "ios" ? 0 : 6,
           },
           tabBarStyle: {
-            height: Platform.OS === "ios" ? 88 : 72,
-            paddingTop: 8,
-            paddingBottom: Platform.OS === "ios" ? 34 : 8,
+            height: Platform.OS === "ios" ? 88 : 70,
+            paddingTop: 6,
+            paddingBottom: Platform.OS === "ios" ? 34 : 10,
             backgroundColor: "#FFFFFF",
-            borderTopWidth: 2,
-            borderTopColor: "#FF9933", // Indian flag saffron
-            elevation: 25,
-            shadowColor: "#FF6B35",
-            shadowOffset: { width: 0, height: -6 },
-            shadowOpacity: 0.15,
-            shadowRadius: 20,
+            borderTopWidth: 1,
+            borderTopColor: "#E5E7EB",
+            elevation: 24,
+            shadowColor: "#000000",
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 16,
             position: "absolute",
           },
           tabBarBackground: () => (
             <View style={{
               flex: 1,
               backgroundColor: "#FFFFFF",
-              borderTopWidth: 2,
-              borderTopColor: "#FF9933",
-              
-            }} />
+              borderTopWidth: 1,
+              borderTopColor: "#E5E7EB",
+            }}>
+              <View style={{
+                position: 'absolute',
+                top: -20,
+                left: '50%',
+                marginLeft: -40,
+                width: 80,
+                height: 80,
+                borderRadius: 40,
+                backgroundColor: '#FFFFFF',
+              }} />
+            </View>
           ),
         }}
       >
@@ -70,22 +185,13 @@ export default function RootLayout() {
           title: "Home",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <View style={{
-              alignItems: "center",
-              justifyContent: "center",
-              width: 48,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: focused ? "#FFF3E0" : "transparent", // Light saffron background
-              borderWidth: focused ? 2 : 0,
-              borderColor: focused ? "#FF9933" : "transparent",
-            }}>
-              <AntDesign 
-                name="home" 
-                size={24} 
-                color={focused ? "#FF6B35" : "#666666"} 
-              />
-            </View>
+            <AnimatedTabIcon 
+              focused={focused}
+              icon="home"
+              outlineIcon="home-outline"
+              color="#FF6B35"
+              inactiveColor="#9CA3AF"
+            />
           ),
         }}
       />
@@ -93,25 +199,16 @@ export default function RootLayout() {
       <Tabs.Screen
         name="Complaints"
         options={{
-          title: "Track Complaints",
+          title: "Track",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <View style={{
-              alignItems: "center",
-              justifyContent: "center",
-              width: 48,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: focused ? "#E8F5E8" : "transparent", // Light green background
-              borderWidth: focused ? 2 : 0,
-              borderColor: focused ? "#ebb811ff" : "transparent", // Indian flag green
-            }}>
-              <MaterialIcons 
-                name="track-changes" 
-                size={24} 
-                color={focused ? "#ebb811ff" : "#666666"} 
-              />
-            </View>
+            <AnimatedTabIcon 
+              focused={focused}
+              icon="list"
+              outlineIcon="list-outline"
+              color="#FF6B35"
+              inactiveColor="#9CA3AF"
+            />
           ),
         }}
       />
@@ -119,32 +216,10 @@ export default function RootLayout() {
       <Tabs.Screen
         name="Post"
         options={{
-          title: "Report Issue", 
+          title: "Report", 
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <View style={{
-              alignItems: "center",
-              justifyContent: "center",
-              width: 62,
-              height: 62,
-              borderRadius: 46,
-              backgroundColor: focused ? "#FF6B35" : "#FF9933", // Saffron gradient
-              marginBottom: 34,
-              elevation: focused ? 15 : 10,
-              shadowColor: "#FF6B35",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.4,
-              shadowRadius: 12,
-              transform: [{ scale: focused ? 1.15 : 1.0 }],
-              borderWidth: 3,
-              borderColor: "#FFFFFF",
-            }}>
-              <MaterialIcons 
-                name="report-problem" 
-                size={26} 
-                color="#FFFFFF" 
-              />
-            </View>
+            <AnimatedReportButton focused={focused} />
           ),
         }}
       />
@@ -155,22 +230,13 @@ export default function RootLayout() {
           title: "Social",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <View style={{
-              alignItems: "center",
-              justifyContent: "center",
-              width: 48,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: focused ? "#E3F2FD" : "transparent", // Light blue background
-              borderWidth: focused ? 2 : 0,
-              borderColor: focused ? "#000080" : "transparent", // Navy blue from flag
-            }}>
-              <Ionicons 
-                name="chatbubbles" 
-                size={24} 
-                color={focused ? "#000080" : "#666666"} 
-              />
-            </View>
+            <AnimatedTabIcon 
+              focused={focused}
+              icon="chatbubbles"
+              outlineIcon="chatbubbles-outline"
+              color="#FF6B35"
+              inactiveColor="#9CA3AF"
+            />
           ),
         }}
       />
@@ -181,22 +247,13 @@ export default function RootLayout() {
           title: "Profile",
           headerShown: false,
           tabBarIcon: ({ focused }) => (
-            <View style={{
-              alignItems: "center",
-              justifyContent: "center",
-              width: 48,
-              height: 36,
-              borderRadius: 18,
-              backgroundColor: focused ? "#FFF3E0" : "transparent", // Light saffron background
-              borderWidth: focused ? 2 : 0,
-              borderColor: focused ? "#FF9933" : "transparent",
-            }}>
-              <Feather 
-                name="user" 
-                size={24} 
-                color={focused ? "#FF6B35" : "#666666"} 
-              />
-            </View>
+            <AnimatedTabIcon 
+              focused={focused}
+              icon="person"
+              outlineIcon="person-outline"
+              color="#FF6B35"
+              inactiveColor="#9CA3AF"
+            />
           ),
         }}
       />

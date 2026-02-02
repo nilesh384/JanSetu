@@ -1,10 +1,9 @@
-import { Stack } from "expo-router";
 import { AuthProvider } from "../context/AuthContext";
 import AuthWrapper from "../components/AuthWrapper";
 import FloatingChatbot from "../components/FloatingChatbot";
 import offlineStorage from "../services/offlineStorage";
 import "../i18n"; // Initialize i18n
-import { usePathname, useRouter } from "expo-router";
+import { usePathname, useRouter, Stack } from "expo-router";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 import { Linking } from 'react-native';

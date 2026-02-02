@@ -88,7 +88,7 @@ export default function ChatbotScreen() {
   const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const flatListRef = useRef<FlatList>(null);
@@ -102,6 +102,7 @@ export default function ChatbotScreen() {
   const loadMessages = async () => {
     if (!user?.id) return;
 
+    setIsLoading(true);
     try {
       const response = await getMessages(user.id) as any;
       if (response.success) {
@@ -109,6 +110,8 @@ export default function ChatbotScreen() {
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -262,41 +265,50 @@ export default function ChatbotScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={renderMessage}
-          style={styles.messagesList}
-          contentContainerStyle={styles.messagesContainer}
-          onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
-          onLayout={() => flatListRef.current?.scrollToEnd()}
-          keyboardShouldPersistTaps="handled"
-        />
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.loadingText}>Loading chats...</Text>
+          </View>
+        ) : (
+          <>
+            <FlatList
+              ref={flatListRef}
+              data={messages}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={renderMessage}
+              style={styles.messagesList}
+              contentContainerStyle={styles.messagesContainer}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd()}
+              onLayout={() => flatListRef.current?.scrollToEnd()}
+              keyboardShouldPersistTaps="handled"
+            />
 
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            value={inputMessage}
-            onChangeText={setInputMessage}
-            placeholder="Type your message..."
-            placeholderTextColor="#999"
-            multiline
-            maxLength={1000}
-            onSubmitEditing={handleSendMessage}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, (!inputMessage.trim() || isSending) && styles.sendButtonDisabled]}
-            onPress={handleSendMessage}
-            disabled={!inputMessage.trim() || isSending}
-          >
-            {isSending ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Ionicons name="send" size={20} color="white" />
-            )}
-          </TouchableOpacity>
-        </View>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.textInput}
+                value={inputMessage}
+                onChangeText={setInputMessage}
+                placeholder="Type your message..."
+                placeholderTextColor="#999"
+                multiline
+                maxLength={1000}
+                onSubmitEditing={handleSendMessage}
+              />
+              <TouchableOpacity
+                style={[styles.sendButton, (!inputMessage.trim() || isSending) && styles.sendButtonDisabled]}
+                onPress={handleSendMessage}
+                disabled={!inputMessage.trim() || isSending}
+              >
+                {isSending ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Ionicons name="send" size={20} color="white" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

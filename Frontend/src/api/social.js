@@ -96,14 +96,18 @@ export const getSocialPosts = async (params = {}) => {
 
     console.log('📥 Response status:', response.status);
     console.log('📄 Response data count:', response.data.posts?.length || 0);
+    if (response.data.posts?.[0]) {
+      console.log('📄 Sample post userVote field:', response.data.posts[0].userVote);
+      console.log('📄 Sample post ID:', response.data.posts[0].id);
+    }
 
     return {
       success: true,
       posts: response.data.posts,
-      totalCount: response.data.totalCount,
-      currentPage: response.data.currentPage,
-      totalPages: response.data.totalPages,
-      hasMore: response.data.hasMore
+      totalCount: response.data.pagination?.total || response.data.totalCount,
+      currentPage: response.data.pagination?.currentPage || response.data.currentPage,
+      totalPages: response.data.pagination?.totalPages || response.data.totalPages,
+      hasMore: response.data.pagination?.hasMore ?? response.data.hasMore
     };
 
   } catch (error) {
