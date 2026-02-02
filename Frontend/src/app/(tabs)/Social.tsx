@@ -1,4 +1,3 @@
-import UniversalHeader from '@/src/components/UniversalHeader';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -176,6 +175,9 @@ export default function Social() {
       // Always send userId if available (needed for vote status)
       if (user) {
         params.userId = user.id;
+        console.log('📤 Fetching posts with userId:', user.id);
+      } else {
+        console.log('⚠️ Fetching posts without userId');
       }
 
       // Add specific filtering based on active tab
@@ -235,12 +237,77 @@ export default function Social() {
   const handleVote = async (postId: string, voteType: 'upvote' | 'downvote') => {
     if (!user || isVoting) return;
 
+    // Find the current post to calculate optimistic changes
+    const currentPost = posts.find(p => p.id === postId) || selectedPostForDetail;
+    if (!currentPost) return;
+
+    const currentVote = currentPost.userVote;
+    let newUpvoteCount = currentPost.upvoteCount;
+    let newDownvoteCount = currentPost.downvoteCount;
+    let newUserVote: 'upvote' | 'downvote' | null = null;
+
+    // Calculate optimistic changes
+    if (voteType === 'upvote') {
+      if (currentVote === 'upvote') {
+        // Remove upvote
+        newUpvoteCount -= 1;
+        newUserVote = null;
+      } else if (currentVote === 'downvote') {
+        // Change from downvote to upvote
+        newDownvoteCount -= 1;
+        newUpvoteCount += 1;
+        newUserVote = 'upvote';
+      } else {
+        // Add upvote
+        newUpvoteCount += 1;
+        newUserVote = 'upvote';
+      }
+    } else {
+      if (currentVote === 'downvote') {
+        // Remove downvote
+        newDownvoteCount -= 1;
+        newUserVote = null;
+      } else if (currentVote === 'upvote') {
+        // Change from upvote to downvote
+        newUpvoteCount -= 1;
+        newDownvoteCount += 1;
+        newUserVote = 'downvote';
+      } else {
+        // Add downvote
+        newDownvoteCount += 1;
+        newUserVote = 'downvote';
+      }
+    }
+
+    // Optimistically update UI immediately
+    setPosts(prev => prev.map(post => 
+      post.id === postId 
+        ? {
+            ...post,
+            upvoteCount: newUpvoteCount,
+            downvoteCount: newDownvoteCount,
+            userVote: newUserVote
+          }
+        : post
+    ));
+
+    // Update selected post for detail modal
+    if (selectedPostForDetail?.id === postId) {
+      setSelectedPostForDetail({
+        ...selectedPostForDetail,
+        upvoteCount: newUpvoteCount,
+        downvoteCount: newDownvoteCount,
+        userVote: newUserVote
+      });
+    }
+
+    // Now make the API call
     setIsVoting(postId);
     try {
       const result = await voteOnPost(postId, user.id, voteType) as VoteResponse;
       
       if (result.success) {
-        // Update post in local state
+        // Update with actual server values
         setPosts(prev => prev.map(post => 
           post.id === postId 
             ? {
@@ -251,10 +318,48 @@ export default function Social() {
               }
             : post
         ));
+
+        // Update selected post if in modal
+        if (selectedPostForDetail?.id === postId) {
+          setSelectedPostForDetail(prev => prev ? {
+            ...prev,
+            upvoteCount: result.upvoteCount ?? prev.upvoteCount,
+            downvoteCount: result.downvoteCount ?? prev.downvoteCount,
+            userVote: result.userVote ?? prev.userVote
+          } : null);
+        }
       } else {
+        // Revert optimistic update on error
+        setPosts(prev => prev.map(post => 
+          post.id === postId 
+            ? {
+                ...post,
+                upvoteCount: currentPost.upvoteCount,
+                downvoteCount: currentPost.downvoteCount,
+                userVote: currentPost.userVote
+              }
+            : post
+        ));
+        if (selectedPostForDetail?.id === postId) {
+          setSelectedPostForDetail(currentPost as SocialPost);
+        }
         Alert.alert('Error', result.message || 'Failed to vote');
       }
     } catch (error) {
+      // Revert optimistic update on error
+      setPosts(prev => prev.map(post => 
+        post.id === postId 
+          ? {
+              ...post,
+              upvoteCount: currentPost.upvoteCount,
+              downvoteCount: currentPost.downvoteCount,
+              userVote: currentPost.userVote
+            }
+          : post
+      ));
+      if (selectedPostForDetail?.id === postId) {
+        setSelectedPostForDetail(currentPost as SocialPost);
+      }
       console.error('Error voting:', error);
       Alert.alert('Error', 'Something went wrong while voting');
     } finally {
@@ -515,17 +620,45 @@ export default function Social() {
         </View>
 
         <View style={styles.engagementRow}>
+          <TouchableOpacity 
+            style={styles.engagementItem}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleVote(item.id, 'upvote');
+            }}
+            activeOpacity={0.6}
+          >
+            <Ionicons 
+              name={item.userVote === 'upvote' ? "thumbs-up" : "thumbs-up-outline"} 
+              size={16} 
+              color={item.userVote === 'upvote' ? "#10B981" : "#9CA3AF"} 
+            />
+            <Text style={[
+              styles.engagementText,
+              item.userVote === 'upvote' && styles.engagementTextActive
+            ]}>{item.upvoteCount}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.engagementItem}
+            onPress={(e) => {
+              e.stopPropagation();
+              handleVote(item.id, 'downvote');
+            }}
+            activeOpacity={0.6}
+          >
+            <Ionicons 
+              name={item.userVote === 'downvote' ? "thumbs-down" : "thumbs-down-outline"} 
+              size={16} 
+              color={item.userVote === 'downvote' ? "#EF4444" : "#9CA3AF"} 
+            />
+            <Text style={[
+              styles.engagementText,
+              item.userVote === 'downvote' && styles.engagementTextActive
+            ]}>{item.downvoteCount}</Text>
+          </TouchableOpacity>
           <View style={styles.engagementItem}>
-            <Ionicons name="arrow-up" size={14} color="#44AA44" />
-            <Text style={styles.engagementText}>{item.upvoteCount}</Text>
-          </View>
-          <View style={styles.engagementItem}>
-            <Ionicons name="chatbubble" size={14} color="#666666" />
+            <Ionicons name="chatbubble-outline" size={15} color="#9CA3AF" />
             <Text style={styles.engagementText}>{item.commentCount}</Text>
-          </View>
-          <View style={styles.engagementItem}>
-            <Ionicons name="eye" size={14} color="#666666" />
-            <Text style={styles.engagementText}>{item.viewCount}</Text>
           </View>
         </View>
       </TouchableOpacity>
@@ -535,10 +668,6 @@ export default function Social() {
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
-        <UniversalHeader
-          title="Community Feed"
-          showBackButton={false}
-        />
         <View style={styles.centerContainer}>
           <Text style={styles.loginPrompt}>Please login to view social posts</Text>
         </View>
@@ -548,11 +677,6 @@ export default function Social() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <UniversalHeader
-        title="Community Feed"
-        showBackButton={true}
-      />
-
       <ScrollView style={styles.scrollContainer}>
         {/* Statistics */}
         {userStats && (
@@ -626,7 +750,7 @@ export default function Social() {
 
           {isLoading && posts.length === 0 ? (
             <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#FF6B35" />
+              <ActivityIndicator size="large" color="#3B82F6" />
               <Text style={styles.loadingText}>Loading posts...</Text>
             </View>
           ) : (
@@ -640,7 +764,7 @@ export default function Social() {
                 <RefreshControl
                   refreshing={isRefreshing}
                   onRefresh={onRefresh}
-                  colors={['#FF6B35']}
+                  colors={['#3B82F6']}
                 />
               }
               onEndReached={loadMore}
@@ -648,7 +772,7 @@ export default function Social() {
               ListFooterComponent={
                 loadingMore ? (
                   <View style={styles.footerLoader}>
-                    <ActivityIndicator size="small" color="#FF6B35" />
+                    <ActivityIndicator size="small" color="#3B82F6" />
                   </View>
                 ) : null
               }
@@ -758,17 +882,18 @@ export default function Social() {
                   ]}
                   onPress={() => handleVote(selectedPostForDetail.id, 'upvote')}
                   disabled={isVoting === selectedPostForDetail.id}
+                  activeOpacity={0.7}
                 >
                   <Ionicons 
-                    name={selectedPostForDetail.userVote === 'upvote' ? "arrow-up" : "arrow-up-outline"} 
-                    size={20} 
-                    color={selectedPostForDetail.userVote === 'upvote' ? "#44AA44" : "#666666"} 
+                    name={selectedPostForDetail.userVote === 'upvote' ? "thumbs-up" : "thumbs-up-outline"} 
+                    size={22} 
+                    color={selectedPostForDetail.userVote === 'upvote' ? "#10B981" : "#6B7280"} 
                   />
                   <Text style={[
                     styles.detailActionText,
                     selectedPostForDetail.userVote === 'upvote' && styles.activeUpvoteText
                   ]}>
-                    {selectedPostForDetail.upvoteCount} Upvote
+                    {selectedPostForDetail.upvoteCount}
                   </Text>
                 </TouchableOpacity>
 
@@ -779,23 +904,24 @@ export default function Social() {
                   ]}
                   onPress={() => handleVote(selectedPostForDetail.id, 'downvote')}
                   disabled={isVoting === selectedPostForDetail.id}
+                  activeOpacity={0.7}
                 >
                   <Ionicons 
-                    name={selectedPostForDetail.userVote === 'downvote' ? "arrow-down" : "arrow-down-outline"} 
-                    size={20} 
-                    color={selectedPostForDetail.userVote === 'downvote' ? "#FF4444" : "#666666"} 
+                    name={selectedPostForDetail.userVote === 'downvote' ? "thumbs-down" : "thumbs-down-outline"} 
+                    size={22} 
+                    color={selectedPostForDetail.userVote === 'downvote' ? "#EF4444" : "#6B7280"} 
                   />
                   <Text style={[
                     styles.detailActionText,
                     selectedPostForDetail.userVote === 'downvote' && styles.activeDownvoteText
                   ]}>
-                    {selectedPostForDetail.downvoteCount} Downvote
+                    {selectedPostForDetail.downvoteCount}
                   </Text>
                 </TouchableOpacity>
 
                 <View style={styles.detailActionButton}>
-                  <Ionicons name="eye-outline" size={20} color="#666666" />
-                  <Text style={styles.detailActionText}>{selectedPostForDetail.viewCount} Views</Text>
+                  <Ionicons name="chatbubble-outline" size={20} color="#6B7280" />
+                  <Text style={styles.detailActionText}>{selectedPostForDetail.commentCount}</Text>
                 </View>
               </View>
 
@@ -805,7 +931,7 @@ export default function Social() {
                 
                 {isLoadingComments ? (
                   <View style={styles.centerContainer}>
-                    <ActivityIndicator size="small" color="#FF6B35" />
+                    <ActivityIndicator size="small" color="#3B82F6" />
                     <Text style={styles.loadingText}>Loading comments...</Text>
                   </View>
                 ) : comments.length === 0 ? (
@@ -864,8 +990,9 @@ export default function Social() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8F9FA',
     paddingBottom: 100,
+    paddingTop: 20,
   },
   modalContainer: {
     flex: 1,
@@ -879,17 +1006,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1A1A1A',
-    marginBottom: 6,
-    letterSpacing: -0.5,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 16,
-    color: '#666666',
+    fontSize: 14,
+    color: '#6B7280',
     marginBottom: 20,
-    fontWeight: '500',
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -918,83 +1043,67 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    backgroundColor: '#FFFFFF',
     marginHorizontal: 16,
-    marginVertical: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
+    marginVertical: 12,
+    borderRadius: 16,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
-    paddingVertical: 8,
   },
   statNumber: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#FF6B35',
-    marginBottom: 6,
-    textShadowColor: 'rgba(255, 107, 53, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#666666',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '500',
   },
   tabContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#F8F9FA',
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    backgroundColor: '#E5E7EB',
     marginHorizontal: 16,
-    marginBottom: 20,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 16,
+    borderRadius: 12,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     alignItems: 'center',
     marginHorizontal: 2,
     backgroundColor: 'transparent',
   },
   activeTab: {
-    backgroundColor: '#FF6B35',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-    transform: [{ scale: 1.02 }],
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#6B7280',
   },
   activeTabText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    color: '#000000',
+    fontWeight: '600',
   },
   postsContainer: {
     paddingHorizontal: 16,
@@ -1101,41 +1210,25 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   priorityBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
     marginBottom: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
   },
   priorityText: {
     fontSize: 11,
     color: '#FFFFFF',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   statusText: {
     fontSize: 11,
     color: '#FFFFFF',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    fontWeight: '600',
   },
   postTitle: {
     fontSize: 20,
@@ -1161,12 +1254,10 @@ const styles = StyleSheet.create({
   locationInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
+    backgroundColor: '#F9FAFB',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     flexShrink: 1,
     flex: 1,
   },
@@ -1219,20 +1310,20 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   activeUpvote: {
-    backgroundColor: 'rgba(68, 170, 68, 0.1)',
-    borderColor: '#44AA44',
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
   },
   activeUpvoteText: {
-    color: '#44AA44',
-    fontWeight: '700',
+    color: '#10B981',
+    fontWeight: '600',
   },
   activeDownvote: {
-    backgroundColor: 'rgba(255, 68, 68, 0.1)',
-    borderColor: '#FF4444',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
   },
   activeDownvoteText: {
-    color: '#FF4444',
-    fontWeight: '700',
+    color: '#EF4444',
+    fontWeight: '600',
   },
   centerContainer: {
     flex: 1,
@@ -1241,26 +1332,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   loginPrompt: {
-    fontSize: 18,
-    color: '#666666',
+    fontSize: 16,
+    color: '#6B7280',
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   loadingText: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 12,
+    fontWeight: '400',
+  },
+  emptyText: {
     fontSize: 16,
-    color: '#888888',
+    color: '#6B7280',
     marginTop: 12,
     fontWeight: '500',
   },
-  emptyText: {
-    fontSize: 18,
-    color: '#666666',
-    marginTop: 12,
-    fontWeight: '600',
-  },
   emptySubtext: {
-    fontSize: 15,
-    color: '#999999',
+    fontSize: 14,
+    color: '#9CA3AF',
     marginTop: 6,
     textAlign: 'center',
   },
@@ -1282,25 +1373,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-    backgroundColor: '#F8F9FA',
+    borderBottomColor: '#E5E7EB',
   },
   closeButton: {
-    padding: 10,
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 8,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1A1A',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
     textAlign: 'center',
   },
   postPreview: {
@@ -1328,17 +1413,10 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   commentItem: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
   },
   commentHeader: {
     flexDirection: 'row',
@@ -1346,82 +1424,66 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   commentAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FF6B35',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    marginRight: 10,
   },
   commentProfilePhoto: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   commentAvatarText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
   commentUserName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#1A1A1A',
+    color: '#000000',
     flex: 1,
   },
   commentTime: {
-    fontSize: 12,
-    color: '#888888',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#9CA3AF',
+    fontWeight: '400',
   },
   commentContent: {
-    fontSize: 15,
-    color: '#333333',
-    lineHeight: 22,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
   },
   commentInputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    padding: 20,
+    padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
-    backgroundColor: '#FAFAFA',
+    borderTopColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
   },
   commentInput: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginRight: 12,
-    color: '#1A1A1A',
-    fontSize: 15,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginRight: 10,
+    color: '#000000',
+    fontSize: 14,
     maxHeight: 100,
-    borderWidth: 1,
-    borderColor: '#E9ECEF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   submitButton: {
-    backgroundColor: '#FF6B35',
-    borderRadius: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    backgroundColor: '#3B82F6',
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
   },
   submitButtonDisabled: {
     backgroundColor: '#CCCCCC',
@@ -1436,16 +1498,14 @@ const styles = StyleSheet.create({
   // Post List Item Styles
   postListItem: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#F0F0F0',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowRadius: 3,
+    elevation: 1,
   },
   postListHeader: {
     flexDirection: 'row',
@@ -1457,32 +1517,30 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FF6B35',
   },
   listAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'linear-gradient(135deg, #FF6B35, #F7931E)',
+    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   listAvatarText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 15,
+    fontWeight: '600',
   },
   listUserName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#1A1A1A',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
     marginBottom: 2,
   },
   listPostTime: {
     fontSize: 12,
-    color: '#888888',
-    fontWeight: '500',
+    color: '#9CA3AF',
+    fontWeight: '400',
   },
   postListMeta: {
     flexDirection: 'row',
@@ -1499,15 +1557,15 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   listPostTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 8,
-    lineHeight: 24,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 6,
+    lineHeight: 22,
   },
   listPostDescription: {
     fontSize: 14,
-    color: '#666666',
+    color: '#6B7280',
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -1517,24 +1575,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   listLocationText: {
-    fontSize: 12,
-    color: '#666666',
+    fontSize: 11,
+    color: '#9CA3AF',
     marginLeft: 4,
-    fontWeight: '500',
+    fontWeight: '400',
     flex: 1,
   },
   listCategoryText: {
-    fontSize: 12,
-    color: '#FF6B35',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 107, 53, 0.2)',
+    fontSize: 11,
+    color: '#6366F1',
+    fontWeight: '500',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
   engagementRow: {
     flexDirection: 'row',
@@ -1547,9 +1601,13 @@ const styles = StyleSheet.create({
   },
   engagementText: {
     fontSize: 12,
-    color: '#666666',
-    fontWeight: '600',
+    color: '#6B7280',
+    fontWeight: '500',
     marginLeft: 4,
+  },
+  engagementTextActive: {
+    color: '#000000',
+    fontWeight: '600',
   },
   // Post Detail Modal Styles
   postDetailContainer: {
@@ -1566,24 +1624,14 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    borderWidth: 3,
-    borderColor: '#FF6B35',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
   },
   detailAvatar: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'linear-gradient(135deg, #FF6B35, #F7931E)',
+    backgroundColor: '#3B82F6',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
   },
   detailAvatarText: {
     color: '#FFFFFF',
@@ -1591,26 +1639,26 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   detailUserName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1A1A1A',
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000000',
     marginBottom: 2,
   },
   detailPostTime: {
-    fontSize: 13,
-    color: '#888888',
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '400',
   },
   detailPostTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1A1A1A',
-    marginBottom: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: 12,
     lineHeight: 28,
   },
   detailPostDescription: {
-    fontSize: 16,
-    color: '#333333',
+    fontSize: 15,
+    color: '#374151',
     lineHeight: 24,
     marginBottom: 20,
   },
@@ -1618,46 +1666,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
-    paddingTop: 20,
+    marginBottom: 20,
+    paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: '#E5E7EB',
   },
   detailActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 20,
-    marginBottom: 24,
+    paddingVertical: 16,
+    marginBottom: 20,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    borderTopColor: '#E5E7EB',
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: '#E5E7EB',
   },
   detailActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: '#F8F9FA',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#E9ECEF',
-    minWidth: 100,
+    borderColor: '#E5E7EB',
+    minWidth: 90,
     justifyContent: 'center',
+    gap: 6,
   },
   detailActionText: {
-    fontSize: 14,
-    color: '#666666',
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+    marginLeft: 6,
   },
   commentsSection: {
     marginBottom: 20,
   },
   commentsSectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1A1A1A',
-    marginBottom: 16,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginBottom: 12,
   },
 });
