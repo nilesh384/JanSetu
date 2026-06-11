@@ -32,8 +32,11 @@
     "issuesResolved": "Issues Resolved",
     "resolutionRate": "Resolution Rate",
     "avgResponseTime": "Avg. Response Time",
+    "pending": "Pending",
+    "assigned": "Assigned",
+    "inProgress": "In Progress",
     "resolved": "Resolved",
-    "inProgress": "In Progress"
+    "rejected": "Rejected"
   },
   "post": {
     "reportCivicIssue": "Report Civic Issue",

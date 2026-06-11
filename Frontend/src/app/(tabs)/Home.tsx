@@ -14,6 +14,52 @@ import { useTranslation } from 'react-i18next';
 import notificationService from '@/src/services/notificationService';
 import BiometricOnboarding from '@/src/components/BiometricOnboarding';
 import { useBiometricOnboarding } from '@/src/utils/useBiometricOnboarding';
+import { Colors, Radii, Spacing, Typography } from '@/src/styles/designSystem';
+
+// Status helper functions
+const getStatusColor = (status?: string) => {
+  const statusColors: { [key: string]: string } = {
+    pending: '#D97706',       // Orange
+    assigned: '#9C27B0',      // Purple  
+    in_progress: '#2563EB',   // Blue
+    resolved: '#059669',      // Green
+    rejected: '#DC2626',      // Red
+  };
+  return statusColors[status?.toLowerCase() || 'pending'] || '#D97706';
+};
+
+const getStatusBgColor = (status?: string) => {
+  const statusBgColors: { [key: string]: string } = {
+    pending: '#FEF3C7',       // Orange light
+    assigned: '#F3E8FF',      // Purple light
+    in_progress: '#DBEAFE',   // Blue light
+    resolved: '#DCFCE7',      // Green light
+    rejected: '#FEE2E2',      // Red light
+  };
+  return statusBgColors[status?.toLowerCase() || 'pending'] || '#FEF3C7';
+};
+
+const getStatusText = (status?: string, t: any) => {
+  const statusLabels: { [key: string]: string } = {
+    pending: t('home.pending'),
+    assigned: t('home.assigned'),
+    in_progress: t('home.inProgress'),
+    resolved: t('home.resolved'),
+    rejected: t('home.rejected'),
+  };
+  return statusLabels[status?.toLowerCase() || 'pending'] || t('home.pending');
+};
+
+const getStatusIcon = (status?: string) => {
+  const statusIcons: { [key: string]: string } = {
+    pending: 'time',
+    assigned: 'person',
+    in_progress: 'hourglass',
+    resolved: 'checkmark-circle',
+    rejected: 'close-circle',
+  };
+  return statusIcons[status?.toLowerCase() || 'pending'] || 'time';
+};
 
 interface ExtendedReport extends Report {
   distance?: number;
@@ -209,7 +255,11 @@ export default function Home() {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        <HomeHeader userName="Rahul" />
+        <HomeHeader
+          userName="Rahul"
+          onReportPress={() => router.push('/(tabs)/Post' as any)}
+          onExplorePress={() => router.push('/complaints/nearby')}
+        />
 
         {/* Main Content Area */}
         <View style={styles.content}>
@@ -281,10 +331,10 @@ export default function Home() {
                 </View>
               ) : nearbyReports.length > 0 ? (
                 nearbyReports.map((report) => {
-                  const statusColor = report.isResolved ? '#059669' : '#D97706';
-                  const statusBgColor = report.isResolved ? '#DCFCE7' : '#FEF3C7';
-                  const statusText = report.isResolved ? t('home.resolved') : t('home.inProgress');
-                  const statusIcon = report.isResolved ? 'checkmark-circle' : 'time';
+                  const statusColor = getStatusColor(report.status);
+                  const statusBgColor = getStatusBgColor(report.status);
+                  const statusText = getStatusText(report.status, t);
+                  const statusIcon = getStatusIcon(report.status);
 
                   return (
                     <TouchableOpacity
@@ -383,7 +433,7 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: Colors.background,
     marginBottom: 50,
   },
   languageSwitcherContainer: {
@@ -396,13 +446,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 20,
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 24,
   },
   section: {
-    marginBottom: 30,
+    marginBottom: Spacing.lg,
   },
   sectionHeader: {
-    marginBottom: 15,
+    marginBottom: 14,
   },
   sectionTitle: {
     flexDirection: 'row',
@@ -410,34 +461,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sectionTitleText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontSize: Typography.sizes.xl,
+    fontWeight: '700',
+    color: Colors.text,
   },
   sectionSubtitle: {
     fontSize: 16,
-    color: '#3e2ce5ff',
+    color: Colors.primary,
     marginTop: 2,
   },
   newsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.card,
     padding: 16,
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 4,
   },
   newsTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: Colors.text,
     marginBottom: 8,
   },
   newsExcerpt: {
     fontSize: 14,
-    color: '#666666',
+    color: Colors.textMuted,
     lineHeight: 20,
   },
   servicesGrid: {
@@ -448,31 +501,35 @@ const styles = StyleSheet.create({
   serviceCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.card,
     padding: 16,
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 4,
     alignItems: 'center',
   },
   serviceTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: Colors.text,
     textAlign: 'center',
   },
   emergencySection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.card,
     padding: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
     elevation: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
     marginBottom: 20,
   },
   emergencyButton: {
@@ -518,13 +575,15 @@ const styles = StyleSheet.create({
   categoryCard: {
     flex: 1,
     minWidth: '35%',
-    borderRadius: 12,
+    borderRadius: Radii.card,
     padding: 10,
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 3,
     alignItems: 'center',
   },
   categoryIcon: {
@@ -537,13 +596,13 @@ const styles = StyleSheet.create({
   },
   categoryTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: Colors.text,
     marginBottom: 4,
   },
   categoryDesc: {
     fontSize: 12,
-    color: '#666666',
+    color: Colors.textMuted,
     textAlign: 'center',
   },
   reportsList: {
@@ -552,15 +611,17 @@ const styles = StyleSheet.create({
   reportItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.card,
     padding: 16,
     marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   reportStatus: {
     width: 40,
@@ -575,13 +636,13 @@ const styles = StyleSheet.create({
   },
   reportTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: Colors.text,
     marginBottom: 4,
   },
   reportLocation: {
     fontSize: 12,
-    color: '#666666',
+    color: Colors.textMuted,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -594,8 +655,8 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    color: '#2563EB',
-    fontWeight: '600',
+    color: Colors.primaryDark,
+    fontWeight: '700',
   },
   communityImpact: {
     backgroundColor: '#FFFFFF',
@@ -636,25 +697,22 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    backgroundColor: '#FFF7ED',
+    borderRadius: Radii.card,
     padding: 16,
     alignItems: 'center',
-    elevation: 1,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
   },
   statNumber: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2563EB',
+    fontWeight: '800',
+    color: Colors.primaryDark,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
-    color: '#666666',
+    color: Colors.textMuted,
     textAlign: 'center',
   },
   loadingContainer: {
@@ -672,24 +730,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 32,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    elevation: 2,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 3,
   },
   emptyText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
+    fontWeight: '700',
+    color: Colors.text,
     marginTop: 12,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#666666',
+    color: Colors.textMuted,
     marginTop: 4,
     textAlign: 'center',
   },

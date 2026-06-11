@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   FlatList,
   SafeAreaView,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -16,6 +15,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ScrollView,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { 
@@ -25,9 +25,10 @@ import {
   getPostComments, 
   getSocialStats, 
   trackPostView,
-  createSocialPost 
 } from '../../api/social.js';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors, Spacing, Radii, Typography } from '../../styles/designSystem';
 
 // Type definitions for API responses
 interface ApiResponse<T = any> {
@@ -47,7 +48,6 @@ interface CommentsResponse extends ApiResponse {
 interface AddCommentResponse extends ApiResponse {
   comment: Comment;
 }
-
 interface SocialPost {
   id: string;
   userId: string;
@@ -68,8 +68,8 @@ interface SocialPost {
     status: 'Submitted' | 'Under Review' | 'In Progress' | 'Resolved';
     latitude: number;
     longitude: number;
-    address: string;
     department: string;
+    address?: string;
     mediaUrls?: string[];
   };
   // User details (joined from users table)
@@ -133,6 +133,7 @@ interface VoteResponse {
 
 export default function Social() {
   const { user, isAuthenticated } = useAuth();
+  const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState('all');
   const [posts, setPosts] = useState<SocialPost[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -142,6 +143,9 @@ export default function Social() {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  
+  // Track if currently fetching to prevent duplicates
+  const isFetchingRef = useRef(false);
 
   // Post detail modal state
   const [postDetailModalVisible, setPostDetailModalVisible] = useState(false);
@@ -155,11 +159,21 @@ export default function Social() {
 
   // Data fetching functions
   const fetchPosts = useCallback(async (page: number = 1, refresh: boolean = false) => {
+    // Prevent duplicate fetches
+    if (isFetchingRef.current) {
+      console.log('⏸️ Fetch already in progress, skipping');
+      return;
+    }
+    
     try {
+      isFetchingRef.current = true;
+      
       if (refresh) {
         setIsRefreshing(true);
+        setCurrentPage(1);
       } else if (page === 1) {
         setIsLoading(true);
+        setCurrentPage(1);
       } else {
         setLoadingMore(true);
       }
@@ -193,7 +207,12 @@ export default function Social() {
         if (page === 1 || refresh) {
           setPosts(newPosts);
         } else {
-          setPosts(prev => [...prev, ...newPosts]);
+          // Append new posts and remove duplicates based on ID
+          setPosts(prev => {
+            const existingIds = new Set(prev.map(p => p.id));
+            const uniqueNewPosts = newPosts.filter(p => !existingIds.has(p.id));
+            return [...prev, ...uniqueNewPosts];
+          });
         }
         
         // Track views for newly loaded posts
@@ -218,6 +237,7 @@ export default function Social() {
       setIsLoading(false);
       setIsRefreshing(false);
       setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   }, [activeTab, user]);
 
@@ -460,31 +480,41 @@ export default function Social() {
   };
 
   // Effects
+  // Fetch posts when tab changes or component mounts
   useEffect(() => {
     if (isAuthenticated) {
+      setCurrentPage(1);
+      setHasMore(true);
+      setPosts([]);
       fetchPosts(1, true);
       fetchUserStats();
     }
-  }, [activeTab, isAuthenticated, fetchPosts, fetchUserStats]);
+  }, [activeTab, isAuthenticated]);
 
   useFocusEffect(
     useCallback(() => {
       if (isAuthenticated) {
+        setCurrentPage(1);
+        setHasMore(true);
         fetchPosts(1, true);
       }
-    }, [isAuthenticated, fetchPosts])
+    }, [isAuthenticated])
   );
 
   const onRefresh = useCallback(() => {
+    setCurrentPage(1);
+    setHasMore(true);
+    setPosts([]);
     fetchPosts(1, true);
     fetchUserStats();
-  }, [fetchPosts, fetchUserStats]);
+  }, []);
 
   const loadMore = useCallback(() => {
-    if (hasMore && !loadingMore && !isLoading) {
+    if (hasMore && !loadingMore && !isLoading && !isFetchingRef.current) {
+      console.log('📥 Loading more posts, page:', currentPage + 1);
       fetchPosts(currentPage + 1);
     }
-  }, [hasMore, loadingMore, isLoading, currentPage, fetchPosts]);
+  }, [hasMore, loadingMore, isLoading, currentPage]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -665,6 +695,96 @@ export default function Social() {
     );
   };
 
+  const renderHeader = () => (
+    <View style={styles.headerStack}>
+      <View style={styles.heroCard}>
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroBadge}>
+            <Ionicons name="pulse" size={14} color={Colors.primaryDark} />
+            <Text style={styles.heroBadgeText}>Community pulse</Text>
+          </View>
+          <View style={styles.heroMiniTag}>
+            <Ionicons name="chatbubbles-outline" size={12} color={Colors.secondary} />
+            <Text style={styles.heroMiniTagText}>Live feed</Text>
+          </View>
+        </View>
+
+        <Text style={styles.heroTitle}>Social</Text>
+        <Text style={styles.heroSubtitle}>
+          Follow what people are reporting, support active posts, and jump into the conversation.
+        </Text>
+
+        <View style={styles.heroMetricRow}>
+          <View style={styles.heroMetricCard}>
+            <Text style={styles.heroMetricValue}>{posts.length}</Text>
+            <Text style={styles.heroMetricLabel}>Posts</Text>
+          </View>
+          <View style={styles.heroMetricCard}>
+            <Text style={styles.heroMetricValue}>{userStats?.totalComments ?? 0}</Text>
+            <Text style={styles.heroMetricLabel}>Comments</Text>
+          </View>
+          <View style={styles.heroMetricCard}>
+            <Text style={styles.heroMetricValue}>{userStats?.totalViews ?? 0}</Text>
+            <Text style={styles.heroMetricLabel}>Views</Text>
+          </View>
+        </View>
+      </View>
+
+      {userStats && (
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{userStats.totalPosts}</Text>
+            <Text style={styles.statLabel}>My Posts</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{userStats.totalUpvotes}</Text>
+            <Text style={styles.statLabel}>Upvotes</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{userStats.totalComments}</Text>
+            <Text style={styles.statLabel}>Comments</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statNumber}>{userStats.totalViews}</Text>
+            <Text style={styles.statLabel}>Views</Text>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'all' && styles.activeTab]}
+          onPress={() => setActiveTab('all')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="grid-outline" size={16} color={activeTab === 'all' ? '#FFFFFF' : '#6B7280'} />
+          <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>All</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'trending' && styles.activeTab]}
+          onPress={() => setActiveTab('trending')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="trending-up" size={16} color={activeTab === 'trending' ? '#FFFFFF' : '#6B7280'} />
+          <Text style={[styles.tabText, activeTab === 'trending' && styles.activeTabText]}>Trending</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'activity' && styles.activeTab]}
+          onPress={() => setActiveTab('activity')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="person-circle-outline" size={16} color={activeTab === 'activity' ? '#FFFFFF' : '#6B7280'} />
+          <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>Mine</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.feedHeader}>
+        <Text style={styles.sectionTitle}>Community Reports</Text>
+        <Text style={styles.sectionSubtitle}>See what is active right now</Text>
+      </View>
+    </View>
+  );
+
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.container}>
@@ -676,119 +796,50 @@ export default function Social() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollContainer}>
-        {/* Statistics */}
-        {userStats && (
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userStats.totalPosts}</Text>
-              <Text style={styles.statLabel}>My Posts</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userStats.totalUpvotes}</Text>
-              <Text style={styles.statLabel}>Upvotes</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userStats.totalComments}</Text>
-              <Text style={styles.statLabel}>Comments</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{userStats.totalViews}</Text>
-              <Text style={styles.statLabel}>Total Views</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Filter Tabs */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'all' && styles.activeTab]}
-            onPress={() => setActiveTab('all')}
-          >
-            <Ionicons
-              name="list"
-              size={20}
-              color={activeTab === 'all' ? '#FFFFFF' : '#666666'}
-            />
-            <Text style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
-              All Posts
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'trending' && styles.activeTab]}
-            onPress={() => setActiveTab('trending')}
-          >
-            <Ionicons
-              name="trending-up"
-              size={20}
-              color={activeTab === 'trending' ? '#FFFFFF' : '#666666'}
-            />
-            <Text style={[styles.tabText, activeTab === 'trending' && styles.activeTabText]}>
-              Trending
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'activity' && styles.activeTab]}
-            onPress={() => setActiveTab('activity')}
-          >
-            <Ionicons
-              name="person"
-              size={20}
-              color={activeTab === 'activity' ? '#FFFFFF' : '#666666'}
-            />
-            <Text style={[styles.tabText, activeTab === 'activity' && styles.activeTabText]}>
-              My Activity
-            </Text>
-          </TouchableOpacity>
+    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+      {isLoading && posts.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>Loading posts...</Text>
         </View>
-
-        {/* Posts Feed */}
-        <View style={styles.feedContainer}>
-          <Text style={styles.sectionTitle}>Community Reports</Text>
-          <Text style={styles.sectionSubtitle}>Stay updated with local issues and community progress</Text>
-
-          {isLoading && posts.length === 0 ? (
-            <View style={styles.centerContainer}>
-              <ActivityIndicator size="large" color="#3B82F6" />
-              <Text style={styles.loadingText}>Loading posts...</Text>
-            </View>
-          ) : (
-            <FlatList
-              data={posts}
-              renderItem={renderPost}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              scrollEnabled={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshing}
-                  onRefresh={onRefresh}
-                  colors={['#3B82F6']}
-                />
-              }
-              onEndReached={loadMore}
-              onEndReachedThreshold={0.1}
-              ListFooterComponent={
-                loadingMore ? (
-                  <View style={styles.footerLoader}>
-                    <ActivityIndicator size="small" color="#3B82F6" />
-                  </View>
-                ) : null
-              }
-              ListEmptyComponent={
-                !isLoading ? (
-                  <View style={styles.centerContainer}>
-                    <Ionicons name="chatbubbles-outline" size={64} color="#CCCCCC" />
-                    <Text style={styles.emptyText}>No posts to show</Text>
-                    <Text style={styles.emptySubtext}>Be the first to share a community report!</Text>
-                  </View>
-                ) : null
-              }
+      ) : (
+        <FlatList
+          data={posts}
+          renderItem={renderPost}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={onRefresh}
+              colors={[Colors.primary]}
+              tintColor={Colors.primary}
             />
-          )}
-        </View>
-      </ScrollView>
+          }
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.2}
+          ListHeaderComponent={renderHeader}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+              </View>
+            ) : (
+              <View style={{ height: insets.bottom + 12 }} />
+            )
+          }
+          ListEmptyComponent={
+            !isLoading ? (
+              <View style={styles.emptyStateWrap}>
+                <Ionicons name="chatbubbles-outline" size={56} color="#CCCCCC" />
+                <Text style={styles.emptyText}>No posts to show</Text>
+                <Text style={styles.emptySubtext}>Be the first to share a community report!</Text>
+              </View>
+            ) : null
+          }
+        />
+      )}
 
       {/* Post Detail Modal */}
       <Modal
@@ -990,13 +1041,110 @@ export default function Social() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
-    paddingBottom: 100,
-    paddingTop: 20,
+    backgroundColor: Colors.background,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: Colors.surface,
+  },
+  listContent: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: 18,
+  },
+  headerStack: {
+    marginBottom: Spacing.md,
+  },
+  heroCard: {
+    marginBottom: Spacing.md,
+    padding: Spacing.lg,
+    borderRadius: Radii.large,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 10,
+  },
+  heroBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: Radii.round,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.95)',
+  },
+  heroBadgeText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.primaryDark,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  heroMiniTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: Radii.round,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  heroMiniTagText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.secondary,
+  },
+  heroTitle: {
+    fontSize: Typography.sizes.displayLarge,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 6,
+    letterSpacing: -0.8,
+  },
+  heroSubtitle: {
+    fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
+    lineHeight: 20,
+    maxWidth: '92%',
+  },
+  heroMetricRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 16,
+  },
+  heroMetricCard: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: Radii.card,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.95)',
+  },
+  heroMetricValue: {
+    fontSize: Typography.sizes.lg,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  heroMetricLabel: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '700',
   },
   feedContainer: {
     paddingHorizontal: 16,
@@ -1006,15 +1154,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sectionTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000000',
+    fontSize: Typography.sizes.xl,
+    fontWeight: '800',
+    color: Colors.text,
     marginBottom: 4,
   },
   sectionSubtitle: {
-    fontSize: 14,
-    color: '#6B7280',
-    marginBottom: 20,
+    fontSize: Typography.sizes.sm,
+    color: Colors.textMuted,
+  },
+  feedHeader: {
+    paddingHorizontal: 4,
+    marginBottom: Spacing.md,
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -1043,67 +1194,70 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginVertical: 12,
-    borderRadius: 16,
-    shadowColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    backgroundColor: Colors.surface,
+    marginBottom: Spacing.md,
+    borderRadius: Radii.large,
+    shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
     elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
   statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#000000',
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.text,
     marginBottom: 4,
   },
   statLabel: {
     fontSize: 11,
-    color: '#9CA3AF',
-    fontWeight: '500',
+    color: Colors.textMuted,
+    fontWeight: '600',
   },
   tabContainer: {
     flexDirection: 'row',
     paddingHorizontal: 4,
     paddingVertical: 4,
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 12,
+    backgroundColor: '#EAEFF6',
+    marginBottom: Spacing.md,
+    borderRadius: Radii.round,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: Radii.round,
     alignItems: 'center',
     marginHorizontal: 2,
     backgroundColor: 'transparent',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
   },
   activeTab: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000000',
+    backgroundColor: Colors.primary,
+    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.2,
     shadowRadius: 2,
     elevation: 1,
   },
   tabText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textMuted,
   },
   activeTabText: {
-    color: '#000000',
-    fontWeight: '600',
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   postsContainer: {
     paddingHorizontal: 16,
@@ -1361,9 +1515,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    marginTop: 60,
-    borderTopLeftRadius: 24,
+    backgroundColor: Colors.surface,
     borderTopRightRadius: 24,
     borderWidth: 1,
     borderColor: '#F0F0F0',
@@ -1393,16 +1545,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
     backgroundColor: '#FAFAFA',
+    paddingTop: 40,
   },
   postPreviewTitle: {
     fontSize: 18,
-    fontWeight: '700',
     color: '#1A1A1A',
     marginBottom: 8,
   },
   postPreviewContent: {
     fontSize: 15,
-    color: '#666666',
+    color: Colors.textMuted,
     lineHeight: 22,
   },
   commentsContainer: {
@@ -1414,9 +1566,15 @@ const styles = StyleSheet.create({
   },
   commentItem: {
     backgroundColor: '#F9FAFB',
-    borderRadius: 12,
+    color: Colors.textMuted,
     padding: 14,
     marginBottom: 10,
+  },
+  emptyStateWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 36,
+    paddingHorizontal: 24,
   },
   commentHeader: {
     flexDirection: 'row',
@@ -1497,15 +1655,17 @@ const styles = StyleSheet.create({
   },
   // Post List Item Styles
   postListItem: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: Radii.large,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   postListHeader: {
     flexDirection: 'row',
@@ -1522,7 +1682,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#3B82F6',
+    backgroundColor: Colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1534,12 +1694,12 @@ const styles = StyleSheet.create({
   listUserName: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000000',
+    color: Colors.text,
     marginBottom: 2,
   },
   listPostTime: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
     fontWeight: '400',
   },
   postListMeta: {
@@ -1559,13 +1719,13 @@ const styles = StyleSheet.create({
   listPostTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000000',
+    color: Colors.text,
     marginBottom: 6,
     lineHeight: 22,
   },
   listPostDescription: {
     fontSize: 14,
-    color: '#6B7280',
+    color: Colors.textMuted,
     lineHeight: 20,
     marginBottom: 12,
   },
@@ -1576,16 +1736,16 @@ const styles = StyleSheet.create({
   },
   listLocationText: {
     fontSize: 11,
-    color: '#9CA3AF',
+    color: Colors.textMuted,
     marginLeft: 4,
     fontWeight: '400',
     flex: 1,
   },
   listCategoryText: {
     fontSize: 11,
-    color: '#6366F1',
+    color: Colors.accent,
     fontWeight: '500',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EFF6FF',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -1601,12 +1761,12 @@ const styles = StyleSheet.create({
   },
   engagementText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: Colors.textMuted,
     fontWeight: '500',
     marginLeft: 4,
   },
   engagementTextActive: {
-    color: '#000000',
+    color: Colors.text,
     fontWeight: '600',
   },
   // Post Detail Modal Styles

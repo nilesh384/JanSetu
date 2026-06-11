@@ -6,6 +6,7 @@ export interface Report {
   description?: string;
   category: string;
   priority: string;
+  status?: string; // pending, assigned, in_progress, resolved, rejected
   mediaUrls: string[];
   audioUrl?: string;
   latitude?: number;

@@ -36,6 +36,7 @@ interface Report {
   description: string;
   category: string;
   priority: string;
+  status?: string; // pending, assigned, in_progress, resolved, rejected
   mediaUrls: string[];
   audioUrl: string | null;
   latitude: number | null;
@@ -275,12 +276,26 @@ export default function ReportDetails() {
   };
 
   // Helper functions
-  const getStatusColor = (isResolved: boolean) => {
-    return isResolved ? '#4CAF50' : '#2196F3';
+  const getStatusColor = (status?: string) => {
+    const statusColors: { [key: string]: string } = {
+      pending: '#FF9800',       // Orange
+      assigned: '#9C27B0',      // Purple
+      in_progress: '#2196F3',   // Blue
+      resolved: '#4CAF50',      // Green
+      rejected: '#F44336',      // Red
+    };
+    return statusColors[status?.toLowerCase() || 'pending'] || '#2196F3';
   };
 
-  const getStatusText = (isResolved: boolean) => {
-    return isResolved ? 'Resolved' : 'Submitted';
+  const getStatusText = (status?: string) => {
+    const statusLabels: { [key: string]: string } = {
+      pending: 'Pending',
+      assigned: 'Assigned',
+      in_progress: 'In Progress',
+      resolved: 'Completed',
+      rejected: 'Rejected',
+    };
+    return statusLabels[status?.toLowerCase() || 'pending'] || 'Pending';
   };
 
   const getPriorityIcon = (priority: string) => {
@@ -367,8 +382,8 @@ export default function ReportDetails() {
                 <Text style={styles.priorityText}>{report.priority}</Text>
               </View>
             </View>
-            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(report.isResolved) }]}>
-              <Text style={styles.statusText}>{getStatusText(report.isResolved)}</Text>
+            <View style={[styles.statusBadge, { backgroundColor: getStatusColor(report.status) }]}>
+              <Text style={styles.statusText}>{getStatusText(report.status)}</Text>
             </View>
           </View>
 
