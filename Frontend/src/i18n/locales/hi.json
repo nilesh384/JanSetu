@@ -32,8 +32,11 @@
     "issuesResolved": "मुद्दे हल किए गए",
     "resolutionRate": "समाधान दर",
     "avgResponseTime": "औसत प्रतिक्रिया समय",
+    "pending": "लंबित",
+    "assigned": "सौंपा गया",
+    "inProgress": "प्रगति में",
     "resolved": "हल हो गया",
-    "inProgress": "प्रगति में"
+    "rejected": "अस्वीकृत"
   },
   "post": {
     "reportCivicIssue": "नागरिक समस्या रिपोर्ट करें",

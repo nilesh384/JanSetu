@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   Alert,
@@ -18,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { sendMessage, getMessages, deleteMessages } from '../api/chat';
 import { useAuth } from '../context/AuthContext';
 import { styles } from '../styles/chatbot.styles';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface Message {
   id: number | string;
@@ -86,6 +86,7 @@ const TypingIndicator = () => {
 export default function ChatbotScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -99,10 +100,13 @@ export default function ChatbotScreen() {
     }
   }, [user]);
 
-  const loadMessages = async () => {
+  const loadMessages = async ({ silent = false }: { silent?: boolean } = {}) => {
     if (!user?.id) return;
 
-    setIsLoading(true);
+    if (!silent) {
+      setIsLoading(true);
+    }
+
     try {
       const response = await getMessages(user.id) as any;
       if (response.success) {
@@ -111,7 +115,9 @@ export default function ChatbotScreen() {
     } catch (error) {
       console.error('Error loading messages:', error);
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -155,8 +161,27 @@ export default function ChatbotScreen() {
     try {
       const response = await sendMessage(messageToSend, user.id) as any;
       if (response.success) {
-        // Reload messages to get the full conversation
-        await loadMessages();
+          const aiMessage: Message = {
+            id: `ai-${Date.now()}`,
+            userId: user.id,
+            role: 'ai',
+            message: response.aiResponse || 'I am processing your request.',
+            createdAt: new Date().toISOString(),
+          };
+
+          setMessages(prev =>
+            prev.map(msg => {
+              if (msg.id === tempUserId) {
+                return { ...msg, isPending: false };
+              }
+
+              if (msg.id === tempAiId) {
+                return aiMessage;
+              }
+
+              return msg;
+            })
+          );
       } else {
         // Remove loading message and show error
         setMessages(prev => prev.filter(msg => msg.id !== tempUserId && msg.id !== tempAiId));
@@ -238,9 +263,9 @@ export default function ChatbotScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Simple Header with Delete and Close buttons */}
-      <View style={styles.simpleHeader}>
+      <View style={[styles.simpleHeader, { paddingTop: insets.top + 10, marginTop: 0 }]}>
         <TouchableOpacity 
           onPress={handleClearChat} 
           disabled={isDeleting}
@@ -310,6 +335,7 @@ export default function ChatbotScreen() {
           </>
         )}
       </KeyboardAvoidingView>
+      <View style={{ height: insets.bottom }} />
     </SafeAreaView>
   );
 }

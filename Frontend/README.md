@@ -1,50 +1,59 @@
-# Welcome to your Expo app 👋
+# JanSetu User App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is the citizen-facing mobile app for JanSetu. It lets users sign in, file complaints, attach media, track status, chat with support helpers, and manage their profile settings.
 
-## Get started
+## Main Features
 
-1. Install dependencies
+- Phone and OTP authentication
+- Complaint creation with categories, media, and location support
+- Nearby complaints and my reports views
+- Report detail and status tracking
+- Profile setup and profile settings screens
+- Biometric onboarding and biometric prompt support
+- In-app chatbot access
+- Push notification and offline storage helpers
 
-   ```bash
-   npm install
-   ```
+## Tech Stack
 
-2. Start the app
+- Expo React Native
+- TypeScript
+- Expo Router
+- Axios
+- Firebase Messaging
+- AsyncStorage and custom offline storage
+- i18next for localization
+- React Native WebView for embedded experiences
+- Expo AV, Camera, Image Picker, and Location
 
-   ```bash
-   npx expo start
-   ```
+## Route Layout
 
-In the output, you'll find options to open the app in a
+- `src/app/(tabs)/` - home, complaints, social, profile, and post flows
+- `src/app/auth/` - phone number, OTP, and profile setup screens
+- `src/app/complaints/` - nearby and my complaint lists
+- `src/app/profileSettings/` - personal, privacy, notifications, biometric, help, and about screens
+- `src/app/chatbot.tsx` - chatbot entry point
+- `src/app/reportDetails.tsx` - complaint details screen
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Supporting Components
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- `src/components/` - auth wrappers, headers, prompts, chatbot button, and reusable UI pieces
+- `src/api/` - request helpers for user, complaint, OTP, notification, media, chat, and social APIs
+- `src/services/` - notification and offline storage services
+- `src/context/` - auth state
+- `src/utils/` - biometric and date helpers
 
-## Get a fresh project
-
-When you're ready, run:
+## Scripts
 
 ```bash
-npm run reset-project
+npm install
+npx expo start
+npm run android
+npm run ios
+npm run web
+npm run lint
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Notes
 
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Set the backend API URL and Firebase configuration before running the app
+- Use the biometric documentation in `BIOMETRIC_AUTHENTICATION.md` for setup details

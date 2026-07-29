@@ -2,6 +2,8 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { Colors, Typography, Spacing, Radii, responsiveSize } from '../styles/designSystem';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface UniversalHeaderProps {
   title: string;
@@ -23,6 +25,7 @@ export default function UniversalHeader({
   backButtonColor = '#000000'
 }: UniversalHeaderProps) {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const handleBackPress = () => {
     if (onBackPress) {
@@ -48,8 +51,7 @@ export default function UniversalHeader({
   };
 
   return (
-    <View style={[styles.container, containerStyle]}>
-      {/* Left Section - Back Button */}
+    <View style={[styles.container, { paddingTop: insets.top + responsiveSize(10), marginTop: insets.top > 0 ? Spacing.sm : 0 }, containerStyle]}>
       <View style={styles.leftSection}>
         {showBackButton && (
           <TouchableOpacity
@@ -57,19 +59,17 @@ export default function UniversalHeader({
             style={styles.backButton}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color={backButtonColor} />
+            <Ionicons name="arrow-back" size={20} color={backButtonColor} />
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Center Section - Title */}
       <View style={styles.centerSection}>
         <Text style={[styles.title, titleStyle]} numberOfLines={1}>
           {title}
         </Text>
       </View>
 
-      {/* Right Section - Custom Component */}
       <View style={styles.rightSection}>
         {rightComponent}
       </View>
@@ -82,13 +82,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: responsiveSize(10),
+    backgroundColor: 'rgba(255,255,255,0.92)',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    minHeight: 56,
-    marginTop: 20,
+    borderBottomColor: 'rgba(226,232,240,0.8)',
+    minHeight: responsiveSize(60),
+    marginHorizontal: Spacing.md,
+    borderRadius: Radii.card,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 1,
+    shadowRadius: 18,
+    elevation: 6,
   },
   leftSection: {
     flex: 1,
@@ -103,14 +109,16 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   backButton: {
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: 'transparent',
+    padding: 10,
+    borderRadius: Radii.round,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1F2937',
+    fontSize: Typography.sizes.xl,
+    fontWeight: Typography.weight.bold as any,
+    color: Colors.text,
     textAlign: 'center',
   },
 });

@@ -33,6 +33,7 @@ interface Report {
   description: string;
   category: string;
   priority: string;
+  status?: string; // pending, assigned, in_progress, resolved, rejected
   mediaUrls: string[];
   audioUrl: string | null;
   latitude: number | null;
@@ -58,12 +59,26 @@ interface ApiResponse {
 }
 
 // Helper functions
-const getStatusColor = (isResolved: boolean) => {
-  return isResolved ? '#4CAF50' : '#2196F3';
+const getStatusColor = (status?: string) => {
+  const statusColors: { [key: string]: string } = {
+    pending: '#FF9800',       // Orange
+    assigned: '#9C27B0',      // Purple
+    in_progress: '#2196F3',   // Blue
+    resolved: '#4CAF50',      // Green
+    rejected: '#F44336',      // Red
+  };
+  return statusColors[status?.toLowerCase() || 'pending'] || '#2196F3';
 };
 
-const getStatusText = (isResolved: boolean) => {
-  return isResolved ? 'Resolved' : 'Submitted';
+const getStatusText = (status?: string) => {
+  const statusLabels: { [key: string]: string } = {
+    pending: 'Pending',
+    assigned: 'Assigned',
+    in_progress: 'In Progress',
+    resolved: 'Completed',
+    rejected: 'Rejected',
+  };
+  return statusLabels[status?.toLowerCase() || 'pending'] || 'Pending';
 };
 
 const getPriorityIcon = (priority: string) => {
@@ -186,8 +201,10 @@ export default function NearbyComplaints() {
 
   const filters = [
     { key: 'All', label: 'All', count: reports.length, icon: 'list-outline' },
-    { key: 'Submitted', label: 'Submitted', count: reports.filter((r: Report) => !r.isResolved).length, icon: 'checkmark-circle-outline' },
-    { key: 'Resolved', label: 'Resolved', count: reports.filter((r: Report) => r.isResolved).length, icon: 'checkmark-circle' },
+    { key: 'Pending', label: 'Pending', count: reports.filter((r: Report) => r.status === 'pending').length, icon: 'time-outline' },
+    { key: 'Assigned', label: 'Assigned', count: reports.filter((r: Report) => r.status === 'assigned').length, icon: 'person-outline' },
+    { key: 'In Progress', label: 'In Progress', count: reports.filter((r: Report) => r.status === 'in_progress').length, icon: 'sync-outline' },
+    { key: 'Completed', label: 'Completed', count: reports.filter((r: Report) => r.status === 'resolved').length, icon: 'checkmark-circle' },
   ];
 
   const sortOptions = [
@@ -200,9 +217,8 @@ export default function NearbyComplaints() {
     .filter((report: Report) => {
       const matchesSearch = report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                            report.description.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesFilter = selectedFilter === 'All' || 
-        (selectedFilter === 'Submitted' && !report.isResolved) ||
-        (selectedFilter === 'Resolved' && report.isResolved);
+      const reportStatus = getStatusText(report.status);
+      const matchesFilter = selectedFilter === 'All' || reportStatus === selectedFilter;
       return matchesSearch && matchesFilter;
     })
     .sort((a: Report, b: Report) => {
@@ -258,8 +274,8 @@ export default function NearbyComplaints() {
               </View>
             )}
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.isResolved) }]}>
-            <Text style={styles.statusText}>{getStatusText(item.isResolved)}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+            <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
           </View>
         </View>
 
