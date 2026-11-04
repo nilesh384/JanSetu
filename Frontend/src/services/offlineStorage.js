@@ -183,7 +183,8 @@ class OfflineStorage {
         address: report.address,
         department: report.department,
         mediaUrls: uploadedMediaUrls,
-        audioUrl: uploadedAudioUrl
+        audioUrl: uploadedAudioUrl,
+        whatsappUpdates: report.whatsappUpdates === true,
       };
 
       // Submit the report

@@ -49,7 +49,8 @@ export const createReport = async (reportData) => {
       latitude: reportData.latitude,
       longitude: reportData.longitude,
       address: reportData.address,
-      department: reportData.department
+      department: reportData.department,
+      whatsappUpdates: reportData.whatsappUpdates === true,
     });
 
     console.log('📥 Response status:', response.status);
