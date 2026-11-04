@@ -3,9 +3,10 @@ import { Audio } from 'expo-av';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Alert,
   Image,
   SafeAreaView,
@@ -32,6 +33,8 @@ interface LocationData {
   longitude: number;
   address?: string;
 }
+
+const WHATSAPP_REPORT_UPDATES_AVAILABLE = false;
 
 export default function Post() {
   const { user } = useAuth();
@@ -142,6 +145,8 @@ export default function Post() {
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [whatsappUpdates, setWhatsappUpdates] = useState(false);
+  const whatsappToggleProgress = useRef(new Animated.Value(0)).current;
   const [mediaItems, setMediaItems] = useState<Array<{ id: string, uri: string, type: 'image' | 'video' }>>([]);
   const [location, setLocation] = useState<LocationData | null>(null);
   const [isLocationLoading, setIsLocationLoading] = useState(false);
@@ -160,6 +165,34 @@ export default function Post() {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [playbackSound, setPlaybackSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  useEffect(() => {
+    Animated.timing(whatsappToggleProgress, {
+      toValue: whatsappUpdates ? 1 : 0,
+      duration: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [whatsappToggleProgress, whatsappUpdates]);
+
+  const handleWhatsAppUpdatesToggle = () => {
+    if (whatsappUpdates) {
+      setWhatsappUpdates(false);
+      return;
+    }
+
+    setWhatsappUpdates(true);
+    if (!WHATSAPP_REPORT_UPDATES_AVAILABLE) {
+      // Let the thumb finish moving to the on position before explaining the feature is unavailable.
+      setTimeout(() => {
+        Alert.alert(
+          t('post.whatsappUnavailableTitle'),
+          t('post.whatsappUnavailableMessage'),
+          [{ text: 'OK', onPress: () => setWhatsappUpdates(false) }],
+          { cancelable: false },
+        );
+      }, 250);
+    }
+  };
 
 
 
@@ -612,7 +645,8 @@ export default function Post() {
       address: location?.address || '',
       department: selectedCategoryData?.department || 'General Administrative Office',
       mediaUrls: uploadedMediaUrls,
-      audioUrl: uploadedAudioUrl
+      audioUrl: uploadedAudioUrl,
+      whatsappUpdates: whatsappUpdates && WHATSAPP_REPORT_UPDATES_AVAILABLE,
     };
 
     // Step 3: Call the actual API to create the report with retry logic
@@ -709,6 +743,7 @@ export default function Post() {
             // Reset form
             setTitle('');
             setDescription('');
+            setWhatsappUpdates(false);
             setSelectedCategory(null);
             setMediaItems([]);
             removeRecording();
@@ -775,6 +810,7 @@ export default function Post() {
           department: selectedCategoryData?.department || 'General Administrative Office',
           mediaUrls: [], // Will be uploaded when online
           audioUrl: '', // Will be uploaded when online
+          whatsappUpdates: whatsappUpdates && WHATSAPP_REPORT_UPDATES_AVAILABLE,
           // Store original media data for later upload
           mediaItems: mediaItems,
           recordingUri: recordingUri
@@ -792,6 +828,7 @@ export default function Post() {
                 // Reset form
                 setTitle('');
                 setDescription('');
+                setWhatsappUpdates(false);
                 setSelectedCategory(null);
                 setMediaItems([]);
                 removeRecording();
@@ -846,6 +883,7 @@ export default function Post() {
                     department: selectedCategoryData?.department || 'General Administrative Office',
                     mediaUrls: [],
                     audioUrl: '',
+                    whatsappUpdates: whatsappUpdates && WHATSAPP_REPORT_UPDATES_AVAILABLE,
                     mediaItems: mediaItems,
                     recordingUri: recordingUri
                   };
@@ -861,6 +899,7 @@ export default function Post() {
                   // Reset form
                   setTitle('');
                   setDescription('');
+                  setWhatsappUpdates(false);
                   setSelectedCategory(null);
                   setMediaItems([]);
                   removeRecording();
@@ -1131,12 +1170,45 @@ export default function Post() {
           </View>
         </View>
 
+        {/* Optional WhatsApp status updates */}
+        <View style={styles.section}>
+          <View style={styles.whatsappUpdatesRow}>
+            <View style={styles.whatsappUpdatesCopy}>
+              <Text style={styles.sectionTitle}>{t('post.whatsappUpdatesTitle')}</Text>
+              <Text style={styles.sectionSubtitle}>{t('post.whatsappUpdatesSubtitle')}</Text>
+            </View>
+            <TouchableOpacity
+              accessibilityRole="switch"
+              accessibilityState={{ checked: whatsappUpdates }}
+              accessibilityLabel={t('post.whatsappUpdatesTitle')}
+              onPress={handleWhatsAppUpdatesToggle}
+              style={[styles.whatsappToggleTrack, whatsappUpdates && styles.whatsappToggleTrackOn]}
+            >
+              <Animated.View
+                style={[
+                  styles.whatsappToggleThumb,
+                  {
+                    transform: [{
+                      translateX: whatsappToggleProgress.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [2, 30],
+                      }),
+                    }],
+                  },
+                ]}
+              >
+                <Ionicons name="logo-whatsapp" size={18} color="#25D366" />
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Submit Button */}
         <View style={styles.submitSection}>
           <TouchableOpacity
-            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            style={[styles.submitButton, (isSubmitting || (whatsappUpdates && !WHATSAPP_REPORT_UPDATES_AVAILABLE)) && styles.submitButtonDisabled]}
             onPress={submitReport}
-            disabled={isSubmitting}
+            disabled={isSubmitting || (whatsappUpdates && !WHATSAPP_REPORT_UPDATES_AVAILABLE)}
           >
             {isSubmitting ? (
               <View style={styles.submitLoadingContainer}>
@@ -1244,6 +1316,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     marginBottom: 16,
+  },
+  whatsappUpdatesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  whatsappUpdatesCopy: {
+    flex: 1,
+  },
+  whatsappToggleTrack: {
+    width: 62,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: 'center',
+    backgroundColor: '#D7DADF',
+  },
+  whatsappToggleTrackOn: {
+    backgroundColor: '#25D366',
+  },
+  whatsappToggleThumb: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
   },
   categoryGrid: {
     flexDirection: 'row',
