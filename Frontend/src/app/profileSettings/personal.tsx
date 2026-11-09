@@ -1,17 +1,8 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import {
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-    ActivityIndicator,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 
 import { useAuth } from '@/src/context/AuthContext';
 import { updateUserProfile } from '@/src/api/user';
@@ -99,7 +90,7 @@ export default function PersonalInfo() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <UniversalHeader title={t('profile.personalInformation')} showBackButton={true} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

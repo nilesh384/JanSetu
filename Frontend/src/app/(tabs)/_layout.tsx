@@ -1,264 +1,260 @@
-import { AntDesign, Feather, Ionicons, MaterialIcons } from '@expo/vector-icons';
-import { Tabs } from "expo-router";
-import { Platform, View, Animated } from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { Tabs, router } from "expo-router";
+import { Platform, View, Text, Animated, StyleSheet, TouchableOpacity } from "react-native";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
-import { useEffect, useRef, useState } from 'react';
-import { router } from 'expo-router';
+import { useEffect, useRef } from 'react';
+import { Colors, Radii, Shadows } from '../../styles/designSystem';
 
-const AnimatedTabIcon = ({ focused, icon, outlineIcon, color, inactiveColor }: any) => {
+interface TabIconProps {
+  focused: boolean;
+  name: string;
+  outlineName: string;
+  label: string;
+}
+
+const ModernTabItem = ({ focused, name, outlineName, label }: TabIconProps) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const translateYAnim = useRef(new Animated.Value(0)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: focused ? 1.1 : 1,
-        friction: 5,
-        tension: 100,
-        useNativeDriver: true,
-      }),
-      Animated.spring(translateYAnim, {
-        toValue: focused ? -20 : 0,
-        friction: 6,
-        tension: 80,
-        useNativeDriver: true,
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: focused ? 1 : 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start();
+    Animated.spring(scaleAnim, {
+      toValue: focused ? 1.08 : 1,
+      friction: 6,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
   }, [focused]);
 
   return (
-    <Animated.View style={{
-      alignItems: "center",
-      justifyContent: "center",
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      backgroundColor: focused ? "#FFF3E0" : "transparent",
-      transform: [{ scale: scaleAnim }, { translateY: translateYAnim }],
-      elevation: focused ? 8 : 0,
-      shadowColor: focused ? "#FF6B35" : "transparent",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: focused ? 0.3 : 0,
-      shadowRadius: 6,
-      borderWidth: focused ? 2 : 0,
-      borderColor: "#FFFFFF",
-    }}>
-      <Ionicons 
-        name={focused ? icon : outlineIcon}
-        size={24} 
-        color={focused ? color : inactiveColor} 
-      />
+    <Animated.View style={[styles.tabItemContainer, { transform: [{ scale: scaleAnim }] }]}>
+      <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
+        <Ionicons
+          name={(focused ? name : outlineName) as any}
+          size={22}
+          color={focused ? Colors.primary : '#64748B'}
+        />
+      </View>
+      <Text style={[styles.tabLabel, focused && styles.tabLabelActive]} numberOfLines={1}>
+        {label}
+      </Text>
+      {focused && <View style={styles.activeIndicatorDot} />}
     </Animated.View>
   );
 };
 
-const AnimatedReportButton = ({ focused }: any) => {
+const CenterReportButton = ({ focused, onPress }: { focused: boolean; onPress?: () => void }) => {
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.spring(scaleAnim, {
-      toValue: focused ? 1.1 : 1.0,
+      toValue: focused ? 1.08 : 1.0,
       friction: 5,
       tension: 100,
       useNativeDriver: true,
     }).start();
-
-    Animated.spring(rotateAnim, {
-      toValue: focused ? 1 : 0,
-      friction: 6,
-      tension: 80,
-      useNativeDriver: true,
-    }).start();
   }, [focused]);
 
-  const rotation = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '90deg'],
-  });
-
   return (
-    <Animated.View style={{
-      alignItems: "center",
-      justifyContent: "center",
-      width: 64,
-      height: 64,
-      borderRadius: 32,
-      backgroundColor: focused ? "#FF6B35" : "#FF8C5A",
-      marginBottom: 32,
-      elevation: focused ? 24 : 16,
-      shadowColor: "#FF6B35",
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: 0.45,
-      shadowRadius: 12,
-      transform: [{ scale: scaleAnim }, { rotate: rotation }],
-      borderWidth: 5,
-      borderColor: "#FFFFFF",
-    }}>
-      <Ionicons 
-        name="add" 
-        size={28} 
-        color="#FFFFFF" 
-      />
-    </Animated.View>
+    <TouchableOpacity
+      activeOpacity={0.88}
+      onPress={onPress}
+      style={styles.centerButtonOuter}
+    >
+      <Animated.View style={[styles.centerButton, { transform: [{ scale: scaleAnim }] }]}>
+        <View style={styles.centerButtonInner}>
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </View>
+      </Animated.View>
+      <Text style={[styles.tabLabel, styles.reportButtonLabel]} numberOfLines={1}>Report</Text>
+    </TouchableOpacity>
   );
 };
 
 export default function RootLayout() {
   const { isAuthenticated, isLoading } = useAuth();
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      // Redirect to phone login if not authenticated
       router.replace('/auth/phone' as any);
     }
   }, [isAuthenticated, isLoading]);
 
-  // Don't render tabs if not authenticated or still loading
   if (!isAuthenticated || isLoading) {
     return null;
   }
 
+  const isIos = Platform.OS === 'ios';
+  const bottomInset = insets.bottom > 0 ? insets.bottom : (isIos ? 22 : 10);
+  const tabHeight = (isIos ? 58 : 60) + bottomInset;
+
   return (
-    <SafeAreaView style={{ flex: 1 }} edges={['bottom']}>
+    <View style={styles.container}>
       <Tabs
         initialRouteName="Home"
         screenOptions={{
-          tabBarActiveTintColor: "#FF6B35",
-          tabBarInactiveTintColor: "#9CA3AF",
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: "600",
-            marginTop: 4,
-            marginBottom: Platform.OS === "ios" ? 0 : 6,
-            fontFamily: Platform.OS === "ios" ? "System" : "sans-serif-medium",
-          },
-          tabBarItemStyle: {
-            paddingTop: 6,
-            paddingBottom: Platform.OS === "ios" ? 0 : 6,
-          },
+          headerShown: false,
+          tabBarShowLabel: false,
           tabBarStyle: {
-            height: Platform.OS === "ios" ? 88 : 70,
-            paddingTop: 6,
-            paddingBottom: Platform.OS === "ios" ? 34 : 10,
-            backgroundColor: "#FFFFFF",
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: tabHeight,
+            backgroundColor: '#FFFFFF',
             borderTopWidth: 1,
-            borderTopColor: "#E5E7EB",
-            elevation: 24,
-            shadowColor: "#000000",
+            borderTopColor: '#F1F5F9',
+            elevation: 12,
+            shadowColor: '#0F172A',
             shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 16,
-            position: "absolute",
+            shadowOpacity: 0.08,
+            shadowRadius: 14,
+            paddingBottom: bottomInset,
+            paddingTop: 6,
           },
-          tabBarBackground: () => (
-            <View style={{
-              flex: 1,
-              backgroundColor: "#FFFFFF",
-              borderTopWidth: 1,
-              borderTopColor: "#E5E7EB",
-            }}>
-              <View style={{
-                position: 'absolute',
-                top: -20,
-                left: '50%',
-                marginLeft: -40,
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: '#FFFFFF',
-              }} />
-            </View>
-          ),
         }}
       >
-      <Tabs.Screen
-        name="Home"
-        options={{
-          title: "Home",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <AnimatedTabIcon 
-              focused={focused}
-              icon="home"
-              outlineIcon="home-outline"
-              color="#FF6B35"
-              inactiveColor="#9CA3AF"
-            />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="Home"
+          options={{
+            title: "Home",
+            tabBarIcon: ({ focused }) => (
+              <ModernTabItem
+                focused={focused}
+                name="home"
+                outlineName="home-outline"
+                label="Home"
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="Complaints"
-        options={{
-          title: "Track",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <AnimatedTabIcon 
-              focused={focused}
-              icon="list"
-              outlineIcon="list-outline"
-              color="#FF6B35"
-              inactiveColor="#9CA3AF"
-            />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="Complaints"
+          options={{
+            title: "Track",
+            tabBarIcon: ({ focused }) => (
+              <ModernTabItem
+                focused={focused}
+                name="layers"
+                outlineName="layers-outline"
+                label="Track"
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="Post"
-        options={{
-          title: "Report", 
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <AnimatedReportButton focused={focused} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="Post"
+          options={{
+            title: "Report",
+            tabBarIcon: ({ focused }) => (
+              <CenterReportButton
+                focused={focused}
+                onPress={() => router.push('/(tabs)/Post' as any)}
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="Social"
-        options={{
-          title: "Social",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <AnimatedTabIcon 
-              focused={focused}
-              icon="chatbubbles"
-              outlineIcon="chatbubbles-outline"
-              color="#FF6B35"
-              inactiveColor="#9CA3AF"
-            />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="Social"
+          options={{
+            title: "Social",
+            tabBarIcon: ({ focused }) => (
+              <ModernTabItem
+                focused={focused}
+                name="chatbubbles"
+                outlineName="chatbubbles-outline"
+                label="Social"
+              />
+            ),
+          }}
+        />
 
-      <Tabs.Screen
-        name="Profile"
-        options={{
-          title: "Profile",
-          headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <AnimatedTabIcon 
-              focused={focused}
-              icon="person"
-              outlineIcon="person-outline"
-              color="#FF6B35"
-              inactiveColor="#9CA3AF"
-            />
-          ),
-        }}
-      />
-      {/* <Stack.Screen name="modal" options={{ presentation: "modal" }} /> */}
-    </Tabs>
-    </SafeAreaView>
-  )
+        <Tabs.Screen
+          name="Profile"
+          options={{
+            title: "Profile",
+            tabBarIcon: ({ focused }) => (
+              <ModernTabItem
+                focused={focused}
+                name="person"
+                outlineName="person-outline"
+                label="Profile"
+              />
+            ),
+          }}
+        />
+      </Tabs>
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  tabItemContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
+    minWidth: 54,
+  },
+  iconWrapper: {
+    width: 38,
+    height: 32,
+    borderRadius: Radii.base,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconWrapperActive: {
+    backgroundColor: Colors.primaryMuted,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  tabLabelActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  activeIndicatorDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.primary,
+    marginTop: 2,
+  },
+  centerButtonOuter: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    top: -14,
+    width: 72,
+  },
+  centerButton: {
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: '#FFFFFF',
+    padding: 3,
+    ...Shadows.floating,
+  },
+  centerButtonInner: {
+    flex: 1,
+    borderRadius: 24,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportButtonLabel: {
+    color: Colors.primaryDark,
+    fontWeight: '700',
+    marginTop: 2,
+    textAlign: 'center',
+    width: 72,
+  },
+});

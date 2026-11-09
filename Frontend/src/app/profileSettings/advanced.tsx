@@ -1,16 +1,8 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import {
-    Alert,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 
 import { useAuth } from '@/src/context/AuthContext';
 import { deleteUser } from '@/src/api/user';
@@ -181,7 +173,7 @@ export default function Advanced() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <UniversalHeader title={t('profile.advancedSettings')} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

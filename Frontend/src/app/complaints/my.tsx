@@ -1,19 +1,8 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState, useEffect } from 'react';
-import {
-  FlatList,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  ActivityIndicator,
-  Alert,
-  Modal,
-} from 'react-native';
+import { FlatList, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ActivityIndicator, Alert, Modal } from 'react-native';
 import { useAuth } from '@/src/context/AuthContext';
 import { getUserReports } from '@/src/api/report';
 import UniversalHeader from '@/src/components/UniversalHeader';
@@ -283,7 +272,7 @@ export default function MyComplaints() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Universal Header */}
       <UniversalHeader
         title="My Reports"

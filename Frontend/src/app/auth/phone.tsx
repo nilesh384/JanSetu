@@ -1,13 +1,6 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
-  StatusBar,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, Alert, StatusBar, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import PhoneEmailAuth from '../../components/PhoneEmailAuth';
@@ -38,7 +31,7 @@ export default function PhoneInput() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="light-content" backgroundColor="#FF6B35" />
       
       <View style={styles.content}>

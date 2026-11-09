@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { getBiometricType } from '../utils/biometrics';
@@ -23,7 +24,7 @@ const BiometricSettings: React.FC = () => {
     authenticateWithBiometric,
   } = useAuth();
 
-  const [biometricType, setBiometricType] = useState<string>('Biometric');
+  const [biometricType, setBiometricType] = useState<string>(Platform.OS === 'android' ? 'Fingerprint' : 'Face ID');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -43,68 +44,38 @@ const BiometricSettings: React.FC = () => {
     setIsLoading(true);
     try {
       if (biometricEnabled) {
-        // Disable biometric authentication
         await disableBiometric();
-        Alert.alert(
-          'Biometric Disabled',
-          `${biometricType} authentication has been disabled. You will need to enter your mobile number to sign in.`,
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Success', `${biometricType} has been disabled`);
       } else {
-        // Enable biometric authentication
         const success = await enableBiometric();
         if (success) {
-          Alert.alert(
-            'Biometric Enabled',
-            `${biometricType} authentication has been enabled. You can now use ${biometricType} to quickly access your account.`,
-            [{ text: 'OK' }]
-          );
+          Alert.alert('Success', `${biometricType} has been enabled`);
         } else {
-          Alert.alert(
-            'Setup Failed',
-            `Failed to enable ${biometricType} authentication. Please ensure your device has ${biometricType} set up and try again.`,
-            [{ text: 'OK' }]
-          );
+          Alert.alert('Error', `Failed to enable ${biometricType}`);
         }
       }
     } catch (error) {
       console.error('Error toggling biometric:', error);
-      Alert.alert(
-        'Error',
-        'An error occurred while updating biometric settings. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
     }
   };
 
   const testBiometric = async () => {
-    if (!biometricEnabled) return;
+    if (isLoading) return;
 
     setIsLoading(true);
     try {
-      const success = await authenticateWithBiometric(`Test ${biometricType} authentication`);
+      const success = await authenticateWithBiometric(`Test ${biometricType} Authentication`);
       if (success) {
-        Alert.alert(
-          'Success!',
-          `${biometricType} authentication test completed successfully.`,
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Success', `${biometricType} authentication successful!`);
       } else {
-        Alert.alert(
-          'Failed',
-          `${biometricType} authentication test failed. Please try again.`,
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Failed', `${biometricType} authentication was not successful.`);
       }
     } catch (error) {
       console.error('Error testing biometric:', error);
-      Alert.alert(
-        'Error',
-        'An error occurred during the test. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to test biometric authentication');
     } finally {
       setIsLoading(false);
     }
@@ -125,11 +96,13 @@ const BiometricSettings: React.FC = () => {
     );
   }
 
+  const isFace = biometricType === 'Face ID' || biometricType === 'Face Unlock';
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Ionicons 
-          name={biometricType === 'Face ID' ? 'scan-outline' : 'finger-print-outline'} 
+          name={isFace ? 'scan-outline' : 'finger-print-outline'} 
           size={48} 
           color="#FF6B35" 
         />

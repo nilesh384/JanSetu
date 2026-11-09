@@ -1,4 +1,5 @@
 import * as LocalAuthentication from 'expo-local-authentication';
+import { Platform } from 'react-native';
 
 export interface BiometricSupport {
   isSupported: boolean;
@@ -39,7 +40,7 @@ export const checkBiometricSupport = async (): Promise<BiometricSupport> => {
 };
 
 export const promptBiometricAuth = async (
-  reason: string = 'Authenticate to access JanSetu'
+  reason: string = 'Scan your fingerprint or authenticate to access JanSetu'
 ): Promise<BiometricAuthResult> => {
   // Prevent concurrent biometric prompts
   if (isBiometricPromptInProgress) {
@@ -77,17 +78,28 @@ export const getBiometricType = async (): Promise<string> => {
   try {
     const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
     
-    if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-      return 'Face ID';
-    } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+    if (Platform.OS === 'android') {
+      // On Android devices, fingerprint is the primary sensor used for app security
+      if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+        return 'Fingerprint';
+      } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+        return 'Face Unlock';
+      } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)) {
+        return 'Iris';
+      }
       return 'Fingerprint';
-    } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.IRIS)) {
-      return 'Iris';
+    } else {
+      // iOS
+      if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+        return 'Face ID';
+      } else if (supportedTypes.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+        return 'Touch ID';
+      }
+      return 'Biometrics';
     }
-    return 'Biometric';
   } catch (error) {
     console.error('Error getting biometric type:', error);
-    return 'Biometric';
+    return Platform.OS === 'android' ? 'Fingerprint' : 'Biometrics';
   }
 };
 

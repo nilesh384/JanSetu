@@ -5,7 +5,6 @@ import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,17 +13,22 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../../context/AuthContext';
 import { uploadProfileImage } from '../../api/user.js';
 import { useTranslation } from 'react-i18next';
-import { Colors, Radii, Spacing } from '@/src/styles/designSystem';
+import { Colors, Radii, Shadows, Spacing, Typography } from '@/src/styles/designSystem';
 
 interface ProfileOption {
   id: string;
   title: string;
   subtitle: string;
   icon: string;
+  iconBg: string;
+  iconColor: string;
   iconType: 'Ionicons' | 'MaterialIcons';
   onPress: () => void;
 }
@@ -40,13 +44,6 @@ export default function Profile() {
   const [isUpdatingImage, setIsUpdatingImage] = useState(false);
   const cameraRef = useRef<CameraView>(null);
 
-  // Debug: Log user object and profile image URL
-  console.log('🔍 User object:', user);
-  console.log('🖼️ Profile image URL:', user?.profileImageUrl);
-  console.log('🖼️ User ID:', user?.id);
-  console.log('🔄 Is loading:', isLoading);
-  console.log('🔐 Is authenticated:', isAuthenticated);
-
   const requestCameraPermission = async () => {
     const { status } = await Camera.requestCameraPermissionsAsync();
     setCameraPermission(status === 'granted');
@@ -56,35 +53,30 @@ export default function Profile() {
   const openCamera = async () => {
     const hasPermission = await requestCameraPermission();
     if (hasPermission) {
-      setZoom(0); // Reset zoom when opening camera
+      setZoom(0);
       setCameraModalVisible(true);
     } else {
-      Alert.alert(t('profile.error'), t('profile.cameraPermissionNeeded'));
+      Alert.alert(t('profile.error') || 'Error', t('profile.cameraPermissionNeeded') || 'Camera permission required');
     }
   };
 
   const updateProfileImage = async (imageUri: string) => {
     if (!user?.id) {
-      Alert.alert(t('profile.error'), t('profile.userNotFound'));
+      Alert.alert(t('profile.error') || 'Error', t('profile.userNotFound') || 'User not found');
       return;
     }
 
     setIsUpdatingImage(true);
-    
     try {
-      console.log('📤 Uploading new profile image...');
-      const result = await uploadProfileImage(user.id, imageUri) as any;
-      
+      const result = (await uploadProfileImage(user.id, imageUri)) as any;
       if (result.success) {
-        // Refresh user data to get the new profile image URL
         await refreshUser();
-        Alert.alert(t('profile.success'), t('profile.profileImageUpdated'));
+        Alert.alert(t('profile.success') || 'Success', t('profile.profileImageUpdated') || 'Profile image updated');
       } else {
-        Alert.alert(t('profile.error'), result.message || t('profile.uploadImageError'));
+        Alert.alert(t('profile.error') || 'Error', result.message || 'Failed to upload image');
       }
     } catch (error) {
-      console.error('Image upload error:', error);
-      Alert.alert(t('profile.error'), t('profile.uploadImageError'));
+      Alert.alert(t('profile.error') || 'Error', 'Failed to upload profile picture');
     } finally {
       setIsUpdatingImage(false);
     }
@@ -98,19 +90,21 @@ export default function Profile() {
           base64: false,
         });
         setCameraModalVisible(false);
-        await updateProfileImage(photo.uri);
+        if (photo?.uri) {
+          await updateProfileImage(photo.uri);
+        }
       } catch (error) {
-        Alert.alert(t('profile.error'), t('profile.takePhotoError'));
+        Alert.alert(t('profile.error') || 'Error', 'Failed to take photo');
       }
     }
   };
 
   const toggleCameraType = () => {
-    setCameraType(current => current === 'back' ? 'front' : 'back');
+    setCameraType((current) => (current === 'back' ? 'front' : 'back'));
   };
 
   const toggleFlash = () => {
-    setFlashMode(current => {
+    setFlashMode((current) => {
       if (current === 'off') return 'on';
       if (current === 'on') return 'auto';
       return 'off';
@@ -125,60 +119,51 @@ export default function Profile() {
     }
   };
 
-  const zoomIn = () => {
-    setZoom(current => Math.min(current + 0.1, 1));
-  };
-
-  const zoomOut = () => {
-    setZoom(current => Math.max(current - 0.1, 0));
-  };
+  const zoomIn = () => setZoom((c) => Math.min(c + 0.1, 1));
+  const zoomOut = () => setZoom((c) => Math.max(c - 0.1, 0));
 
   const pickImage = async () => {
-    // Request permission
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (status !== 'granted') {
-      Alert.alert(t('profile.permissionNeeded'));
+      Alert.alert(t('profile.permissionNeeded') || 'Gallery permission needed');
       return;
     }
 
-    // Launch image picker
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       quality: 0.8,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets?.[0]?.uri) {
       await updateProfileImage(result.assets[0].uri);
     }
   };
 
   const showImageOptions = () => {
     Alert.alert(
-      'Change Profile Picture',
-      'Choose an option',
+      'Profile Photo',
+      'Choose an option to update your photo',
       [
         {
           text: '📸 Take Photo',
           onPress: () => {
-            // Simple camera launch without modal
             ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              mediaTypes: ['images'],
               allowsEditing: true,
               quality: 0.8,
-            }).then(result => {
-              if (!result.canceled) {
+            }).then((result) => {
+              if (!result.canceled && result.assets?.[0]?.uri) {
                 updateProfileImage(result.assets[0].uri);
               }
-            }).catch(error => {
-              Alert.alert(t('profile.error'), t('profile.openCameraError'));
+            }).catch(() => {
+              Alert.alert('Error', 'Could not open camera');
             });
-          }
+          },
         },
         {
           text: '🖼️ Choose from Gallery',
-          onPress: pickImage
+          onPress: pickImage,
         },
         { text: 'Cancel', style: 'cancel' },
       ]
@@ -188,57 +173,51 @@ export default function Profile() {
   const profileOptions: ProfileOption[] = [
     {
       id: 'personal',
-      title: 'Edit Personal Information',
-      subtitle: 'Update your name, email, and contact details',
+      title: 'Personal Information',
+      subtitle: 'Name, email, and phone verification',
       icon: 'person-outline',
+      iconBg: '#FFF7ED',
+      iconColor: Colors.primary,
       iconType: 'Ionicons',
       onPress: () => router.push('/profileSettings/personal'),
     },
     {
       id: 'biometric',
       title: 'Biometric Security',
-      subtitle: 'Manage fingerprint and face recognition',
+      subtitle: Platform.OS === 'android' ? 'Fingerprint login & security' : 'Face ID & Biometrics',
       icon: 'finger-print-outline',
+      iconBg: '#F0F9FF',
+      iconColor: '#0284C7',
       iconType: 'Ionicons',
       onPress: () => router.push('/profileSettings/biometric'),
     },
-    // {
-    //   id: 'notifications',
-    //   title: 'Notifications',
-    //   subtitle: 'Manage notification preferences',
-    //   icon: 'notifications-outline',
-    //   iconType: 'Ionicons',
-    //   onPress: () => router.push('/profileSettings/notifications'),
-    // },
-    // {
-    //   id: 'privacy',
-    //   title: 'Privacy & Security',
-    //   subtitle: 'Control your privacy settings',
-    //   icon: 'shield-outline',
-    //   iconType: 'Ionicons',
-    //   onPress: () => router.push('/profileSettings/privacy'),
-    // },
     {
       id: 'help',
-      title: 'Help & Support',
-      subtitle: 'Get help and contact support',
-      icon: 'help-circle-outline',
+      title: 'Citizen Help & Grievance FAQ',
+      subtitle: 'Guide to filing & tracking complaints',
+      icon: 'help-buoy-outline',
+      iconBg: '#FAF5FF',
+      iconColor: '#7C3AED',
       iconType: 'Ionicons',
       onPress: () => router.push('/profileSettings/help'),
     },
     {
       id: 'about',
-      title: 'About',
-      subtitle: 'App version and information',
+      title: 'About JanSetu',
+      subtitle: 'App version, terms, privacy & mission',
       icon: 'information-circle-outline',
+      iconBg: '#ECFDF5',
+      iconColor: Colors.successDark,
       iconType: 'Ionicons',
       onPress: () => router.push('/profileSettings/about'),
     },
     {
       id: 'advanced',
-      title: 'Advanced',
-      subtitle: 'Advanced settings and account management',
+      title: 'Preferences & Cache',
+      subtitle: 'Offline data, notifications & storage',
       icon: 'settings-outline',
+      iconBg: '#F1F5F9',
+      iconColor: '#475569',
       iconType: 'Ionicons',
       onPress: () => router.push('/profileSettings/advanced'),
     },
@@ -246,19 +225,19 @@ export default function Profile() {
 
   const handleLogout = () => {
     Alert.alert(
-      t('profile.logout'),
-      t('profile.logoutConfirm'),
+      t('profile.logout') || 'Log Out',
+      t('profile.logoutConfirm') || 'Are you sure you want to log out of JanSetu?',
       [
-        { text: t('profile.cancel'), style: 'cancel' },
+        { text: t('profile.cancel') || 'Cancel', style: 'cancel' },
         { 
-          text: t('profile.confirmLogout'), 
+          text: t('profile.confirmLogout') || 'Log Out', 
           style: 'destructive', 
           onPress: async () => {
             try {
               await logout();
               router.replace('/auth/phone' as any);
             } catch (error) {
-              Alert.alert(t('profile.logoutError'));
+              Alert.alert('Error', 'Failed to log out');
             }
           }
         },
@@ -266,170 +245,156 @@ export default function Profile() {
     );
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      t('profile.deleteAccount'),
-      t('profile.deleteAccountConfirm'),
-      [
-        { text: t('profile.cancel'), style: 'cancel' },
-        {
-          text: t('profile.deleteAccount'),
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(t('profile.accountDeletion'), t('profile.accountDeletionMessage'));
-          }
-        },
-      ]
-    );
-  };
-
-  const handleAdvancedPress = () => {
-    Alert.alert(
-      t('profile.advancedSettings'),
-      t('profile.selectOption'),
-      [
-        { text: t('profile.cancel'), style: 'cancel' },
-        {
-          text: t('profile.dataManagement'),
-          onPress: () => Alert.alert(t('profile.comingSoon'), t('profile.dataManagementMessage'))
-        },
-        {
-          text: t('profile.deleteAccount'),
-          style: 'destructive',
-          onPress: handleDeleteAccount
-        },
-      ]
-    );
-  };
-
-  // Show loading state while user data is being fetched
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar style="dark" backgroundColor="#F8FAFC" />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={styles.loadingText}>Loading profile...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // Show error state if not authenticated
   if (!isAuthenticated || !user) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Please log in to view your profile</Text>
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar style="dark" backgroundColor="#F8FAFC" />
+        <View style={styles.centerContainer}>
+          <Text style={styles.emptyTitle}>Sign in to view your citizen profile</Text>
           <TouchableOpacity 
-            style={styles.loginButton}
+            style={styles.primaryButton}
             onPress={() => router.replace('/auth/phone' as any)}
           >
-            <Text style={styles.loginButtonText}>Go to Login</Text>
+            <Text style={styles.primaryButtonText}>Go to Login</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
   }
 
+  const reportsSubmitted = user?.totalReports || 0;
+  const reportsResolved = user?.resolvedReports || 0;
+  const civicScore = Math.max(10, reportsSubmitted * 15 + reportsResolved * 35);
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Profile Header */}
-        <View style={styles.header}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style="dark" backgroundColor="#F8FAFC" />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Profile Card Header */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileGlow} />
+
+          {/* Citizen Verification Badge */}
+          <View style={styles.citizenBadgeRow}>
+            <View style={styles.citizenBadge}>
+              <Ionicons name="shield-checkmark" size={13} color={Colors.primaryDark} />
+              <Text style={styles.citizenBadgeText}>Verified Citizen • JanSetu</Text>
+            </View>
+          </View>
+
+          {/* Avatar Container */}
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatarBorder}>
               {user?.profileImageUrl ? (
                 <Image 
                   source={{ uri: user.profileImageUrl }} 
-                  style={styles.avatarImage}
-                  onError={(error) => console.log('❌ Image load error:', error)}
-                  onLoad={() => console.log('✅ Image loaded successfully')}
+                  style={styles.avatarImg}
                 />
               ) : (
-                <Ionicons name="person" size={40} color="#666666" />
+                <Ionicons name="person" size={44} color={Colors.primary} />
               )}
               {isUpdatingImage && (
-                <View style={styles.imageLoadingOverlay}>
+                <View style={styles.imageOverlay}>
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 </View>
               )}
             </View>
+
             <TouchableOpacity 
-              style={styles.editAvatarButton} 
+              style={styles.editCameraButton} 
               onPress={showImageOptions}
               disabled={isUpdatingImage}
+              activeOpacity={0.85}
             >
-              <Ionicons name="camera" size={16} color="#FFFFFF" />
+              <Ionicons name="camera" size={14} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-          <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.fullName || user?.phoneNumber || 'User'}</Text>
-            <Text style={styles.userEmail}>{user?.email || 'No email provided'}</Text>
-            <Text style={styles.userLocation}>{user?.phoneNumber || 'Phone not available'}</Text>
+
+          {/* User Details */}
+          <Text style={styles.nameText}>{user?.fullName || 'Citizen User'}</Text>
+          <Text style={styles.phoneText}>{user?.phoneNumber || '+91 • Registered Phone'}</Text>
+          {user?.email ? <Text style={styles.emailText}>{user.email}</Text> : null}
+        </View>
+
+        {/* Civic Statistics */}
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>{reportsSubmitted}</Text>
+            <Text style={styles.statLabel}>Grievances</Text>
+            <Text style={styles.statSub}>Submitted</Text>
+          </View>
+
+          <View style={styles.statBox}>
+            <Text style={[styles.statNumber, { color: Colors.successDark }]}>{reportsResolved}</Text>
+            <Text style={styles.statLabel}>Resolved</Text>
+            <Text style={styles.statSub}>Closed</Text>
+          </View>
+
+          <View style={styles.statBox}>
+            <Text style={[styles.statNumber, { color: '#0284C7' }]}>{civicScore}</Text>
+            <Text style={styles.statLabel}>Civic Score</Text>
+            <Text style={styles.statSub}>Impact Pts</Text>
           </View>
         </View>
 
-        {/* Statistics Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{user?.totalReports || 0}</Text>
-            <Text style={styles.statLabel}>{t('profile.complaints')}</Text>
-            <Text style={styles.statSubLabel}>{t('profile.submitted')}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{user?.resolvedReports || 0}</Text>
-            <Text style={styles.statLabel}>{t('profile.resolved')}</Text>
-            <Text style={styles.statSubLabel}>{t('profile.total')}</Text>
-          </View>
-          {/* <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{(user?.totalReports || 0) - (user?.resolvedReports || 0)}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-            <Text style={styles.statSubLabel}>Active</Text>
-          </View> */}
-        </View>
-
-        {/* Settings Options */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('profile.settings')}</Text>
-          {profileOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={styles.optionCard}
-              onPress={option.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={styles.optionLeft}>
-                {option.iconType === 'Ionicons' ? (
-                  <Ionicons name={option.icon as any} size={24} color="#666666" />
-                ) : (
-                  <MaterialIcons name={option.icon as any} size={24} color="#666666" />
-                )}
-                <View style={styles.optionText}>
-                  <Text style={styles.optionTitle}>{option.title}</Text>
-                  <Text style={styles.optionSubtitle}>{option.subtitle}</Text>
+        {/* Settings Group */}
+        <View style={styles.optionsSection}>
+          <Text style={styles.sectionHeaderTitle}>Account & Settings</Text>
+          <View style={styles.optionsCard}>
+            {profileOptions.map((opt, index) => (
+              <TouchableOpacity
+                key={opt.id}
+                style={[
+                  styles.optionRow,
+                  index < profileOptions.length - 1 && styles.optionRowBorder,
+                ]}
+                onPress={opt.onPress}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIconBox, { backgroundColor: opt.iconBg }]}>
+                  <Ionicons name={opt.icon as any} size={20} color={opt.iconColor} />
                 </View>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color="#CCCCCC" />
-            </TouchableOpacity>
-          ))}
+                <View style={styles.optionDetails}>
+                  <Text style={styles.optionTitle}>{opt.title}</Text>
+                  <Text style={styles.optionSubtitle}>{opt.subtitle}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
 
-        {/* Account Actions */}
-        <View style={styles.section}>
+        {/* Logout Action */}
+        <View style={styles.logoutSection}>
           <TouchableOpacity
             style={styles.logoutButton}
             onPress={handleLogout}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
           >
-            <Ionicons name="log-out-outline" size={20} color="#F44336" />
-            <Text style={styles.logoutText}>{t('profile.logout')}</Text>
+            <Ionicons name="log-out-outline" size={18} color={Colors.dangerDark} />
+            <Text style={styles.logoutButtonText}>Log Out from JanSetu</Text>
           </TouchableOpacity>
         </View>
 
-        {/* App Version */}
-        <View style={styles.versionContainer}>
-          <Text style={styles.versionText}>{t('profile.version')}</Text>
-          <Text style={styles.copyrightText}>{t('profile.copyright')}</Text>
+        {/* Footer Info */}
+        <View style={styles.footerWrap}>
+          <Text style={styles.footerVersion}>JanSetu Citizen App • v1.0.0 (SIH Edition)</Text>
+          <Text style={styles.footerNotice}>Empowering transparent governance & community collaboration.</Text>
         </View>
       </ScrollView>
 
@@ -453,59 +418,36 @@ export default function Profile() {
                   style={styles.closeButton}
                   onPress={() => setCameraModalVisible(false)}
                 >
-                  <Ionicons name="close" size={30} color="#FFFFFF" />
+                  <Ionicons name="close" size={26} color="#FFFFFF" />
                 </TouchableOpacity>
               </View>
 
               <View style={styles.cameraControls}>
-                <TouchableOpacity
-                  style={styles.controlButton}
-                  onPress={toggleFlash}
-                >
-                  <Ionicons name={getFlashIcon()} size={24} color="#FFFFFF" />
+                <TouchableOpacity style={styles.controlButton} onPress={toggleFlash}>
+                  <Ionicons name={getFlashIcon() as any} size={22} color="#FFFFFF" />
                   <Text style={styles.controlText}>Flash</Text>
                 </TouchableOpacity>
 
                 <View style={styles.zoomContainer}>
-                  <TouchableOpacity
-                    style={styles.zoomButton}
-                    onPress={zoomOut}
-                    disabled={zoom <= 0}
-                  >
-                    <Ionicons name="remove" size={20} color={zoom <= 0 ? "#666666" : "#FFFFFF"} />
+                  <TouchableOpacity style={styles.zoomButton} onPress={zoomOut} disabled={zoom <= 0}>
+                    <Ionicons name="remove" size={18} color="#FFFFFF" />
                   </TouchableOpacity>
-
-                  <View style={styles.zoomIndicator}>
-                    <Text style={styles.zoomText}>{Math.round(zoom * 100)}%</Text>
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.zoomButton}
-                    onPress={zoomIn}
-                    disabled={zoom >= 1}
-                  >
-                    <Ionicons name="add" size={20} color={zoom >= 1 ? "#666666" : "#FFFFFF"} />
+                  <Text style={styles.zoomText}>{Math.round(zoom * 100)}%</Text>
+                  <TouchableOpacity style={styles.zoomButton} onPress={zoomIn} disabled={zoom >= 1}>
+                    <Ionicons name="add" size={18} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.controlButton}
-                  onPress={toggleCameraType}
-                >
-                  <Ionicons name="camera-reverse" size={24} color="#FFFFFF" />
+                <TouchableOpacity style={styles.controlButton} onPress={toggleCameraType}>
+                  <Ionicons name="camera-reverse" size={22} color="#FFFFFF" />
                   <Text style={styles.controlText}>Flip</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.cameraFooter}>
-                <View style={styles.captureContainer}>
-                  <TouchableOpacity
-                    style={styles.captureButton}
-                    onPress={takePhoto}
-                  >
-                    <View style={styles.captureButtonInner} />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity style={styles.captureButton} onPress={takePhoto}>
+                  <View style={styles.captureButtonInner} />
+                </TouchableOpacity>
               </View>
             </View>
           </CameraView>
@@ -518,175 +460,209 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
-  header: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 30,
+  scrollContent: {
+    paddingBottom: 95,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  primaryButton: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: Radii.pill,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  profileCard: {
+    backgroundColor: '#FFFFFF',
     marginHorizontal: Spacing.md,
     marginTop: Spacing.md,
     borderRadius: Radii.large,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 123,
-    height: 123,
-    borderRadius: 60,
-    backgroundColor: '#FFF7ED',
+    padding: Spacing.lg,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: Colors.primary,
-    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    ...Shadows.card,
   },
-  avatarImage: {
-    width: 120,
+  profileGlow: {
+    position: 'absolute',
+    top: -50,
+    width: 200,
     height: 120,
     borderRadius: 60,
+    backgroundColor: 'rgba(255, 107, 53, 0.08)',
   },
-  editAvatarButton: {
+  citizenBadgeRow: {
+    marginBottom: Spacing.md,
+  },
+  citizenBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFF7ED',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: Radii.pill,
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+  },
+  citizenBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primaryDark,
+  },
+  avatarWrap: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  avatarBorder: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 3,
+    borderColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editCameraButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
-  },
-  userInfo: {
     alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.soft,
   },
-  userName: {
-    fontSize: 22,
+  nameText: {
+    fontSize: 20,
     fontWeight: '800',
     color: Colors.text,
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: Colors.textMuted,
     marginBottom: 2,
   },
-  userLocation: {
+  phoneText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  emailText: {
     fontSize: 12,
-    color: Colors.muted,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
-  statsContainer: {
+  statsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    justifyContent: 'space-around',
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.md,
+    gap: 10,
   },
-  statCard: {
-    backgroundColor: Colors.surface,
+  statBox: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
     borderRadius: Radii.card,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     alignItems: 'center',
-    minWidth: 80,
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 3,
+    borderColor: '#E2E8F0',
+    ...Shadows.soft,
   },
   statNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '800',
     color: Colors.primaryDark,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.text,
     marginBottom: 2,
   },
-  statSubLabel: {
-    fontSize: 10,
-    color: Colors.textMuted,
-  },
-  section: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  quickActionButton: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radii.card,
-    padding: 16,
-    alignItems: 'center',
-    minWidth: 80,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 2,
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: Colors.primaryDark,
+  statLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    marginTop: 8,
-    textAlign: 'center',
+    color: Colors.text,
   },
-  optionCard: {
-    backgroundColor: Colors.surface,
+  statSub: {
+    fontSize: 9,
+    color: Colors.textMuted,
+    marginTop: 1,
+  },
+  optionsSection: {
+    marginTop: Spacing.lg,
+    paddingHorizontal: Spacing.md,
+  },
+  sectionHeaderTitle: {
+    fontSize: Typography.sizes.md,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 10,
+  },
+  optionsCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: Radii.card,
-    padding: 16,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 1,
-    shadowRadius: 14,
-    elevation: 2,
+    borderColor: '#E2E8F0',
+    ...Shadows.soft,
+    overflow: 'hidden',
   },
-  optionLeft: {
+  optionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    padding: Spacing.md,
+    gap: 12,
   },
-  optionText: {
-    marginLeft: 12,
+  optionRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  optionIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: Radii.base,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionDetails: {
     flex: 1,
   },
   optionTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 14,
+    fontWeight: '700',
     color: Colors.text,
     marginBottom: 2,
   },
@@ -694,35 +670,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
   },
+  logoutSection: {
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.lg,
+  },
   logoutButton: {
-    backgroundColor: '#FFF7ED',
-    borderRadius: Radii.card,
-    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
     borderWidth: 1,
-    borderColor: '#FED7AA',
+    borderColor: '#FEE2E2',
+    paddingVertical: 14,
+    borderRadius: Radii.card,
   },
-  logoutText: {
-    fontSize: 16,
-    color: Colors.primaryDark,
+  logoutButtonText: {
+    fontSize: 14,
     fontWeight: '700',
-    marginLeft: 8,
+    color: Colors.dangerDark,
   },
-  versionContainer: {
+  footerWrap: {
     alignItems: 'center',
-    paddingVertical: 24,
-    paddingHorizontal: 16,
+    paddingTop: Spacing.xl,
+    paddingBottom: Spacing.sm,
+    paddingHorizontal: Spacing.md,
   },
-  versionText: {
-    fontSize: 12,
+  footerVersion: {
+    fontSize: 11,
+    fontWeight: '600',
     color: Colors.textMuted,
-    marginBottom: 4,
+    marginBottom: 3,
   },
-  copyrightText: {
+  footerNotice: {
     fontSize: 10,
-    color: Colors.muted,
+    color: '#94A3B8',
+    textAlign: 'center',
   },
   cameraContainer: {
     flex: 1,
@@ -733,142 +716,69 @@ const styles = StyleSheet.create({
   },
   cameraOverlay: {
     flex: 1,
-    backgroundColor: 'transparent',
     justifyContent: 'space-between',
+    padding: Spacing.lg,
+    paddingTop: 50,
   },
   cameraHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    padding: 20,
-    paddingTop: 50,
   },
   closeButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  cameraControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  controlButton: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  controlText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  zoomContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: Radii.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  zoomButton: {
+    padding: 4,
+  },
+  zoomText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
   },
   cameraFooter: {
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 50,
+    marginBottom: 20,
   },
   captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#FFFFFF',
   },
   captureButtonInner: {
     width: 60,
     height: 60,
     borderRadius: 30,
     backgroundColor: '#FFFFFF',
-  },
-  cameraControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    marginBottom: 20,
-  },
-  controlButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 12,
-    padding: 12,
-    minWidth: 70,
-  },
-  controlText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  captureContainer: {
-    alignItems: 'center',
-  },
-  zoomContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-  },
-  zoomButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 4,
-  },
-  zoomIndicator: {
-    minWidth: 50,
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  zoomText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  imageLoadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: Colors.textMuted,
-    fontWeight: '500',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-    paddingHorizontal: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    color: Colors.text,
-    textAlign: 'center',
-    marginBottom: 20,
-    fontWeight: '500',
-  },
-  loginButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: Radii.round,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });

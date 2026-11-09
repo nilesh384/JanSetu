@@ -1,21 +1,19 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import React from 'react';
 import {
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Colors, Radii, Spacing, Typography } from '@/src/styles/designSystem';
-
-
+import { Colors, Radii, Shadows, Spacing, Typography } from '@/src/styles/designSystem';
 
 export default function IssueTracker() {
-
   const router = useRouter();
   const { t } = useTranslation();
 
@@ -27,89 +25,182 @@ export default function IssueTracker() {
     router.push('/complaints/nearby' as any);
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+  const resolutionSteps = [
+    {
+      step: '1',
+      title: 'Report Filed',
+      desc: 'Instant ticket generated with GPS coordinates.',
+      icon: 'document-text-outline',
+      color: Colors.primary,
+      bg: '#FFF7ED',
+    },
+    {
+      step: '2',
+      title: 'AI & Dept Routing',
+      desc: 'Assigned automatically to relevant municipality.',
+      icon: 'git-network-outline',
+      color: '#0284C7',
+      bg: '#F0F9FF',
+    },
+    {
+      step: '3',
+      title: 'Field Inspection',
+      desc: 'Civic personnel dispatched for site inspection.',
+      icon: 'construct-outline',
+      color: '#7C3AED',
+      bg: '#FAF5FF',
+    },
+    {
+      step: '4',
+      title: 'Proof & Resolution',
+      desc: 'Resolved with before/after photos & citizen sign-off.',
+      icon: 'checkmark-circle-outline',
+      color: Colors.success,
+      bg: '#ECFDF5',
+    },
+  ];
 
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style="dark" backgroundColor="#F8FAFC" />
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Hero Header */}
         <View style={styles.heroCard}>
           <View style={styles.heroGlowTop} />
           <View style={styles.heroGlowBottom} />
 
+          <View style={styles.heroBadge}>
+            <Ionicons name="shield-checkmark" size={14} color={Colors.primaryDark} />
+            <Text style={styles.heroBadgeText}>Citizen Redressal Hub</Text>
+          </View>
+
+          <Text style={styles.heroTitle}>Issue Tracker & Grievance Portal</Text>
           
 
-          <Text style={styles.heroTitle}>Issue Tracker</Text>
-          
-
-          
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStatPill}>
+              <Ionicons name="flash" size={12} color={Colors.primary} />
+              <Text style={styles.heroStatText}>Live SLA Tracking</Text>
+            </View>
+            <View style={styles.heroStatPill}>
+              <Ionicons name="lock-closed" size={12} color={Colors.successDark} />
+              <Text style={styles.heroStatText}>Tamper-Proof Audit</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Navigation Cards */}
+        {/* Primary Action Cards */}
         <View style={styles.cardsContainer}>
           {/* My Complaints Card */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.navigationCard}
             onPress={handleNavigateToMyComplaints}
             activeOpacity={0.88}
           >
             <View style={styles.cardHeader}>
               <View style={[styles.cardIconContainer, { backgroundColor: '#FFF7ED' }]}>
-                <MaterialIcons name="person" size={30} color={Colors.primaryDark} />
+                <MaterialIcons name="person" size={26} color={Colors.primaryDark} />
               </View>
 
               <View style={styles.cardBadge}>
-                <Text style={styles.cardBadgeText}>{t('complaints.myComplaints')}</Text>
+                <Text style={styles.cardBadgeText}>{t('complaints.myComplaints') || 'My Complaints'}</Text>
               </View>
             </View>
+
+            <Text style={styles.cardTitle}>My Filed Grievances</Text>
             
-            <Text style={styles.cardTitle}>Open your reports</Text>
-            <Text style={styles.cardDescription}>Check status, progress, and updates in one place.</Text>
-            
+
             <View style={styles.cardFooter}>
-              <Text style={styles.cardAction}>{t('complaints.viewDetails')}</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.primaryDark} />
+              <Text style={styles.cardAction}>{t('complaints.viewDetails') || 'View Details'}</Text>
+              <View style={styles.arrowCircle}>
+                <Ionicons name="arrow-forward" size={14} color={Colors.primaryDark} />
+              </View>
             </View>
           </TouchableOpacity>
 
           {/* Nearby Complaints Card */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.navigationCard}
             onPress={handleNavigateToNearbyComplaints}
             activeOpacity={0.88}
           >
             <View style={styles.cardHeader}>
-              <View style={[styles.cardIconContainer, { backgroundColor: '#ECFDF5' }]}>
-                <Ionicons name="location" size={30} color={Colors.secondary} />
+              <View style={[styles.cardIconContainer, { backgroundColor: '#F0F9FF' }]}>
+                <Ionicons name="location" size={26} color="#0284C7" />
               </View>
 
-              <View style={[styles.cardBadge, { backgroundColor: '#ECFDF5', borderColor: '#BBF7D0' }]}>
-                <Text style={[styles.cardBadgeText, { color: Colors.secondary }]}>{t('complaints.allNearbyComplaints')}</Text>
+              <View style={[styles.cardBadge, { backgroundColor: '#F0F9FF', borderColor: '#BAE6FD' }]}>
+                <Text style={[styles.cardBadgeText, { color: '#0284C7' }]}>
+                  {t('complaints.allNearbyComplaints') || 'Ward Issues'}
+                </Text>
               </View>
             </View>
+
+            <Text style={styles.cardTitle}>Ward & Nearby Feed</Text>
             
-            <Text style={styles.cardTitle}>See nearby issues</Text>
-            <Text style={styles.cardDescription}>Browse complaints around you without extra steps.</Text>
-           
-           <View style={styles.cardFooter}>
-              <Text style={styles.cardAction}>{t('complaints.explore')}</Text>
-              <Ionicons name="arrow-forward" size={18} color={Colors.secondary} />
+
+            <View style={styles.cardFooter}>
+              <Text style={[styles.cardAction, { color: '#0284C7' }]}>
+                {t('complaints.explore') || 'Explore Locality'}
+              </Text>
+              <View style={[styles.arrowCircle, { backgroundColor: '#F0F9FF' }]}>
+                <Ionicons name="arrow-forward" size={14} color="#0284C7" />
+              </View>
             </View>
           </TouchableOpacity>
         </View>
 
-        {/* Quick Actions */}
+        {/* Resolution Transparency Journey */}
+        <View style={styles.lifecycleSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="git-branch-outline" size={18} color={Colors.primary} />
+            <Text style={styles.sectionTitle}>How Resolution Works</Text>
+          </View>
+          <Text style={styles.lifecycleSubtitle}>
+            Every grievance filed on JanSetu goes through a 4-step accountable timeline.
+          </Text>
+
+          <View style={styles.stepsGrid}>
+            {resolutionSteps.map((item) => (
+              <View key={item.step} style={styles.stepCard}>
+                <View style={[styles.stepIconWrap, { backgroundColor: item.bg }]}>
+                  <Ionicons name={item.icon as any} size={20} color={item.color} />
+                  <View style={[styles.stepBadgeNumber, { backgroundColor: item.color }]}>
+                    <Text style={styles.stepBadgeText}>{item.step}</Text>
+                  </View>
+                </View>
+                <Text style={styles.stepTitle}>{item.title}</Text>
+                <Text style={styles.stepDesc}>{item.desc}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Quick Report CTA */}
         <View style={styles.quickActionsSection}>
-          <Text style={styles.sectionTitle}>Quick action</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.quickActionButton}
             onPress={() => router.push('/(tabs)/Post' as any)}
             activeOpacity={0.9}
           >
-            <MaterialIcons name="report-problem" size={24} color="#FFFFFF" />
-            <Text style={styles.quickActionText}>{t('complaints.reportNewIssue')}</Text>
+            <View style={styles.quickActionIconWrap}>
+              <MaterialIcons name="add" size={24} color="#FFFFFF" />
+            </View>
+            <View style={styles.quickActionTextWrap}>
+              <Text style={styles.quickActionTitle}>
+                {t('complaints.reportNewIssue') || 'Report a New Civic Issue'}
+              </Text>
+              <Text style={styles.quickActionSubtitle}>
+                Takes less than 30 seconds with instant camera photo
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-
-        
       </ScrollView>
     </SafeAreaView>
   );
@@ -118,117 +209,109 @@ export default function IssueTracker() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
   content: {
     flex: 1,
-    paddingTop: 0,
+  },
+  scrollContent: {
+    paddingBottom: 95,
   },
   heroCard: {
     marginHorizontal: Spacing.md,
-    marginTop: Spacing.xl,
+    marginTop: Spacing.md,
     marginBottom: Spacing.md,
-    padding: Spacing.md,
+    padding: Spacing.lg,
     borderRadius: Radii.large,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#FED7AA',
-    shadowColor: '#FB923C',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 5,
+    ...Shadows.card,
     overflow: 'hidden',
   },
   heroGlowTop: {
     position: 'absolute',
-    top: -24,
-    right: -28,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(249,115,22,0.12)',
+    top: -30,
+    right: -30,
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(255, 107, 53, 0.08)',
   },
   heroGlowBottom: {
     position: 'absolute',
-    bottom: -34,
-    left: -18,
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    backgroundColor: 'rgba(29,78,216,0.08)',
+    bottom: -40,
+    left: -20,
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: 'rgba(2, 132, 199, 0.06)',
   },
   heroBadge: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Radii.round,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radii.pill,
     backgroundColor: '#FFF7ED',
     borderWidth: 1,
     borderColor: '#FED7AA',
     marginBottom: 10,
   },
   heroBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: Colors.primaryDark,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   heroTitle: {
-    fontSize: Typography.sizes.xl + 6,
+    fontSize: Typography.sizes.xl,
     fontWeight: '800',
     color: Colors.text,
-    marginBottom: 0,
-    lineHeight: 30,
+    marginBottom: 6,
+    lineHeight: 28,
   },
   heroSubtitle: {
     fontSize: Typography.sizes.sm,
     color: Colors.textMuted,
-    lineHeight: 18,
-    maxWidth: '92%',
+    lineHeight: 20,
+    marginBottom: 14,
   },
   heroStatsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 18,
+    gap: 8,
   },
   heroStatPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: Radii.round,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radii.pill,
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.92)',
+    borderColor: '#E2E8F0',
   },
   heroStatText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: Colors.text,
+    color: Colors.textSecondary,
   },
   cardsContainer: {
     paddingHorizontal: Spacing.md,
-    marginBottom: Spacing.md,
+    gap: 12,
+    marginBottom: Spacing.lg,
   },
   navigationCard: {
-    backgroundColor: Colors.surface,
+    backgroundColor: '#FFFFFF',
     borderRadius: Radii.large,
-    padding: 14,
-    marginBottom: 10,
+    padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 22,
-    elevation: 4,
+    borderColor: '#E2E8F0',
+    ...Shadows.card,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -237,26 +320,24 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   cardIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardBadge: {
     backgroundColor: '#FFF7ED',
-    borderRadius: Radii.round,
+    borderRadius: Radii.pill,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    minWidth: 24,
-    alignItems: 'center',
+    paddingVertical: 4,
     borderWidth: 1,
     borderColor: '#FED7AA',
   },
   cardBadgeText: {
     color: Colors.primaryDark,
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 11,
+    fontWeight: '700',
   },
   cardTitle: {
     fontSize: Typography.sizes.lg,
@@ -265,10 +346,10 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   cardDescription: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.textMuted,
-    lineHeight: 17,
-    marginBottom: 10,
+    lineHeight: 18,
+    marginBottom: 12,
   },
   cardFooter: {
     flexDirection: 'row',
@@ -276,41 +357,124 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: '#F8FAFC',
   },
   cardAction: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.primaryDark,
   },
-  quickActionsSection: {
+  arrowCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lifecycleSection: {
     paddingHorizontal: Spacing.md,
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 2,
   },
   sectionTitle: {
     fontSize: Typography.sizes.md,
     fontWeight: '800',
     color: Colors.text,
+  },
+  lifecycleSubtitle: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginBottom: 12,
+  },
+  stepsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 10,
+  },
+  stepCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radii.card,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.soft,
+  },
+  stepIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: Radii.base,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
+    position: 'relative',
+  },
+  stepBadgeNumber: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  stepTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.text,
+    marginBottom: 3,
+  },
+  stepDesc: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    lineHeight: 15,
+  },
+  quickActionsSection: {
+    paddingHorizontal: Spacing.md,
+    marginBottom: Spacing.md,
   },
   quickActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: Colors.primary,
     paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: Radii.round,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.24,
-    shadowRadius: 18,
-    elevation: 4,
+    paddingHorizontal: 16,
+    borderRadius: Radii.card,
+    ...Shadows.floating,
+    gap: 12,
   },
-  quickActionText: {
+  quickActionIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionTextWrap: {
+    flex: 1,
+  },
+  quickActionTitle: {
     color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  quickActionSubtitle: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 11,
+    marginTop: 2,
   },
 });

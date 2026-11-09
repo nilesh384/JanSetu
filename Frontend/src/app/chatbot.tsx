@@ -265,7 +265,7 @@ export default function ChatbotScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Simple Header with Delete and Close buttons */}
-      <View style={[styles.simpleHeader, { paddingTop: insets.top + 10, marginTop: 0 }]}>
+      <View style={styles.simpleHeader}>
         <TouchableOpacity 
           onPress={handleClearChat} 
           disabled={isDeleting}
@@ -277,7 +277,9 @@ export default function ChatbotScreen() {
             <MaterialIcons name="delete" size={24} color="#ff0000" />
           )}
         </TouchableOpacity>
-        <View style={{ flex: 1 }} />
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>JanAI Assistant</Text>
+        </View>
         <TouchableOpacity 
           onPress={() => router.back()} 
           style={styles.headerButton}

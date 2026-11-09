@@ -1,22 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  FlatList,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  RefreshControl,
-  Alert,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-  ScrollView,
-} from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View, RefreshControl, Alert, ActivityIndicator, Modal, TextInput, KeyboardAvoidingView, Platform, Image, ScrollView } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { 
   getSocialPosts, 
@@ -27,7 +11,7 @@ import {
   trackPostView,
 } from '../../api/social.js';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, Spacing, Radii, Typography } from '../../styles/designSystem';
 
 // Type definitions for API responses
@@ -787,7 +771,7 @@ export default function Social() {
 
   if (!isAuthenticated) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.centerContainer}>
           <Text style={styles.loginPrompt}>Please login to view social posts</Text>
         </View>
@@ -796,7 +780,7 @@ export default function Social() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { paddingTop: insets.top }]}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {isLoading && posts.length === 0 ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />

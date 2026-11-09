@@ -1,14 +1,6 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, Image, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet } from 'react-native';
@@ -97,7 +89,7 @@ export default function UserDetails() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <UniversalHeader title="User Details" showBackButton={true} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
@@ -109,7 +101,7 @@ export default function UserDetails() {
 
   if (error || !user) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <UniversalHeader title="User Details" showBackButton={true} />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={48} color="#FF6B35" />
@@ -121,7 +113,7 @@ export default function UserDetails() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <UniversalHeader title="User Details" showBackButton={true} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

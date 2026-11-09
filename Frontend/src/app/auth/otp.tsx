@@ -1,15 +1,6 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  Alert,
-  StatusBar,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, StatusBar, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { verifyOTP, sendOTP} from '../../api/otp.js';
@@ -132,7 +123,7 @@ export default function OTPInput() {
   const isValidOTP = otp.every(digit => digit !== '') && otp.join('').length === 6;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
       <View style={styles.content}>
 

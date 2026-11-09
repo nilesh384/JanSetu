@@ -1,18 +1,9 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import UniversalHeader from '@/src/components/UniversalHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import {
-    Alert,
-    Linking,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 interface FAQ {
@@ -127,7 +118,7 @@ export default function HelpSupport() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <UniversalHeader title={t('profile.helpSupport')} showBackButton={true} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

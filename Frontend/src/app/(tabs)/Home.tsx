@@ -1,8 +1,21 @@
 import HomeHeader from '@/components/HomeHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import { getNearbyReports, getCommunityStats } from '@/src/api/report';
@@ -14,51 +27,51 @@ import { useTranslation } from 'react-i18next';
 import notificationService from '@/src/services/notificationService';
 import BiometricOnboarding from '@/src/components/BiometricOnboarding';
 import { useBiometricOnboarding } from '@/src/utils/useBiometricOnboarding';
-import { Colors, Radii, Spacing, Typography } from '@/src/styles/designSystem';
+import { Colors, Radii, Shadows, Spacing, Typography } from '@/src/styles/designSystem';
 
 // Status helper functions
-const getStatusColor = (status?: string) => {
+const getStatusColor = (status?: string): string => {
   const statusColors: { [key: string]: string } = {
-    pending: '#D97706',       // Orange
-    assigned: '#9C27B0',      // Purple  
-    in_progress: '#2563EB',   // Blue
-    resolved: '#059669',      // Green
-    rejected: '#DC2626',      // Red
+    pending: '#D97706',
+    assigned: '#7C3AED',
+    in_progress: '#2563EB',
+    resolved: '#059669',
+    rejected: '#DC2626',
   };
   return statusColors[status?.toLowerCase() || 'pending'] || '#D97706';
 };
 
-const getStatusBgColor = (status?: string) => {
+const getStatusBgColor = (status?: string): string => {
   const statusBgColors: { [key: string]: string } = {
-    pending: '#FEF3C7',       // Orange light
-    assigned: '#F3E8FF',      // Purple light
-    in_progress: '#DBEAFE',   // Blue light
-    resolved: '#DCFCE7',      // Green light
-    rejected: '#FEE2E2',      // Red light
+    pending: '#FEF3C7',
+    assigned: '#F3E8FF',
+    in_progress: '#DBEAFE',
+    resolved: '#DCFCE7',
+    rejected: '#FEE2E2',
   };
   return statusBgColors[status?.toLowerCase() || 'pending'] || '#FEF3C7';
 };
 
-const getStatusText = (status?: string, t: any) => {
+const getStatusText = (status: string | undefined, t: any): string => {
   const statusLabels: { [key: string]: string } = {
-    pending: t('home.pending'),
-    assigned: t('home.assigned'),
-    in_progress: t('home.inProgress'),
-    resolved: t('home.resolved'),
-    rejected: t('home.rejected'),
+    pending: t('home.pending') || 'Pending Review',
+    assigned: t('home.assigned') || 'Assigned',
+    in_progress: t('home.inProgress') || 'In Progress',
+    resolved: t('home.resolved') || 'Resolved',
+    rejected: t('home.rejected') || 'Rejected',
   };
-  return statusLabels[status?.toLowerCase() || 'pending'] || t('home.pending');
+  return statusLabels[status?.toLowerCase() || 'pending'] || 'Pending';
 };
 
-const getStatusIcon = (status?: string) => {
-  const statusIcons: { [key: string]: string } = {
-    pending: 'time',
-    assigned: 'person',
-    in_progress: 'hourglass',
+const getStatusIcon = (status?: string): keyof typeof Ionicons.glyphMap => {
+  const statusIcons: { [key: string]: keyof typeof Ionicons.glyphMap } = {
+    pending: 'time-outline',
+    assigned: 'person-outline',
+    in_progress: 'hourglass-outline',
     resolved: 'checkmark-circle',
     rejected: 'close-circle',
   };
-  return statusIcons[status?.toLowerCase() || 'pending'] || 'time';
+  return statusIcons[status?.toLowerCase() || 'pending'] || 'time-outline';
 };
 
 interface ExtendedReport extends Report {
@@ -87,6 +100,7 @@ export default function Home() {
   
   const [nearbyReports, setNearbyReports] = useState<ExtendedReport[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [communityStats, setCommunityStats] = useState({
     reportsSubmitted: 0,
@@ -96,19 +110,16 @@ export default function Home() {
   });
   const [statsLoading, setStatsLoading] = useState(false);
 
-  // Use centralized helper that correctly parses server timestamps
-  // formatTimeAgo accepts ISO or SQL-like timestamp strings
-
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Radius of the Earth in kilometers
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const R = 6371;
+    const dLat = ((lat2 - lat1) * Math.PI) / 180;
+    const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c; // Distance in kilometers
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * 
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
   };
 
   const getUserLocation = async () => {
@@ -134,10 +145,9 @@ export default function Home() {
 
     try {
       setLoading(true);
-      const response = await getNearbyReports(userLocation, 5) as any; // 5km radius
+      const response = (await getNearbyReports(userLocation, 5)) as any;
 
       if (response && response.success && response.reports) {
-        // Calculate distances and get only the latest 2
         const reportsWithDistance = response.reports
           .map((report: any) => {
             if (report.latitude && report.longitude && userLocation) {
@@ -156,7 +166,7 @@ export default function Home() {
             const tb = parseServerDate(b.createdAt)?.getTime() || 0;
             return tb - ta;
           })
-          .slice(0, 2); // Get only the latest 2 reports
+          .slice(0, 3);
 
         setNearbyReports(reportsWithDistance);
       }
@@ -170,7 +180,7 @@ export default function Home() {
   const fetchCommunityStats = async () => {
     try {
       setStatsLoading(true);
-      const response = await getCommunityStats() as CommunityStatsResponse;
+      const response = (await getCommunityStats()) as CommunityStatsResponse;
       if (response.success && response.stats) {
         setCommunityStats({
           reportsSubmitted: response.stats.totalReports || 0,
@@ -178,23 +188,27 @@ export default function Home() {
           resolutionRate: `${response.stats.resolutionRate || 0}%`,
           avgResponseTime: response.stats.avgResponseTime || '0.0'
         });
-      } else {
-        // Keep default values if response is not successful
-        console.warn('Community stats response not successful:', response);
       }
     } catch (error) {
       console.error('Error fetching community stats:', error);
-      // Keep default values on error
     } finally {
       setStatsLoading(false);
     }
   };
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchCommunityStats(),
+      userLocation ? fetchNearbyReports() : getUserLocation(),
+    ]);
+    setRefreshing(false);
+  }, [userLocation]);
+
   const initializeNotifications = async () => {
     try {
       const token = await notificationService.initialize();
       if (token && user) {
-        // Update token for the current user
         await notificationService.updateTokenForUser(user.id);
       }
     } catch (error) {
@@ -205,15 +219,13 @@ export default function Home() {
   useEffect(() => {
     getUserLocation();
     initializeNotifications();
-    
-    // Multiple retry attempts for pending navigation
+
     const timers = [
       setTimeout(() => notificationService.retryPendingNavigation(), 2000),
       setTimeout(() => notificationService.forceNavigationIfPending(), 4000),
-      setTimeout(() => notificationService.retryPendingNavigation(), 6000),
     ];
-    
-    return () => timers.forEach(timer => clearTimeout(timer));
+
+    return () => timers.forEach((timer) => clearTimeout(timer));
   }, []);
 
   useEffect(() => {
@@ -226,21 +238,9 @@ export default function Home() {
     fetchCommunityStats();
   }, []);
 
-  // Handle navigation when screen comes into focus (from push notifications)
-  // Also refresh community stats and nearby reports when returning to Home
   useFocusEffect(
-    React.useCallback(() => {
-      console.log('🏠 Home screen focused, checking for pending navigation...');
-      
-      // Force check for pending navigation when screen is focused
-      setTimeout(() => {
-        notificationService.forceNavigationIfPending();
-      }, 1000);
-
-      // Refresh community stats when screen comes into focus
+    useCallback(() => {
       fetchCommunityStats();
-      
-      // Refresh nearby reports if location is available
       if (userLocation) {
         fetchNearbyReports();
       }
@@ -248,86 +248,66 @@ export default function Home() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Language Switcher positioned outside ScrollView */}
-      <View style={styles.languageSwitcherContainer}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar style="dark" backgroundColor="#FFFFFF" />
+
+      {/* Top Utility Bar (Below Camera Notch) */}
+      <View style={styles.topUtilityBar}>
+        <View style={styles.appBrandRow}>
+          <View style={styles.logoBadge}>
+            <Ionicons name="megaphone" size={16} color="#FFFFFF" />
+          </View>
+          <View>
+            <Text style={styles.brandTitle}>JANSETU</Text>
+            <Text style={styles.brandSubtitle}>जन सेतु • Citizen Portal</Text>
+          </View>
+        </View>
         <LanguageSwitcher />
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[Colors.primary]} />
+        }
+      >
         <HomeHeader
-          userName="Rahul"
+          userName={user?.fullName || 'Citizen'}
           onReportPress={() => router.push('/(tabs)/Post' as any)}
-          onExplorePress={() => router.push('/complaints/nearby')}
+          onExplorePress={() => router.push('/complaints/nearby' as any)}
         />
 
-        {/* Main Content Area */}
         <View style={styles.content}>
-
-          {/* Quick Report Categories */}
-          {/* <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitle}>
-                <Text style={styles.sectionTitleText}>Report an Issue</Text>
-                <TouchableOpacity
-                  onPress={() => router.push('/(tabs)/Post' as any)}
-                >
-                  <Text style={styles.sectionSubtitle}>See all</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.reportCategories}>
-              <TouchableOpacity style={[styles.categoryCard, { backgroundColor: '#FFF8F6' }]}>
-                <View style={[styles.categoryIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Ionicons name="construct" size={24} color="#DC2626" />
-                </View>
-                <Text style={styles.categoryTitle}>Infrastructure</Text>
-                <Text style={styles.categoryDesc}>Roads, bridges, streetlights</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.categoryCard, { backgroundColor: '#F0FDF4' }]}>
-                <View style={[styles.categoryIcon, { backgroundColor: '#DCFCE7' }]}>
-                  <Ionicons name="trash" size={24} color="#059669" />
-                </View>
-                <Text style={styles.categoryTitle}>Sanitation</Text>
-                <Text style={styles.categoryDesc}>Waste, garbage, cleanliness</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.categoryCard, { backgroundColor: '#EFF6FF' }]}>
-                <View style={[styles.categoryIcon, { backgroundColor: '#DBEAFE' }]}>
-                  <Ionicons name="water" size={24} color="#2563EB" />
-                </View>
-                <Text style={styles.categoryTitle}>Utilities</Text>
-                <Text style={styles.categoryDesc}>Water, electricity, gas</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity style={[styles.categoryCard, { backgroundColor: '#FDF4FF' }]}>
-                <View style={[styles.categoryIcon, { backgroundColor: '#F3E8FF' }]}>
-                  <Ionicons name="shield-checkmark" size={24} color="#7C3AED" />
-                </View>
-                <Text style={styles.categoryTitle}>Safety</Text>
-                <Text style={styles.categoryDesc}>Public safety, security</Text>
-              </TouchableOpacity>
-            </View>
-          </View> */}
-
-          {/* Recent Reports */}
+          {/* Recent Nearby Reports Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitle}>
-                <Text style={styles.sectionTitleText}>{t('home.recentNearbyReports')}</Text>
-                <TouchableOpacity onPress={() => router.push('/complaints/nearby')}>
-                    <Text style={styles.viewAllText}>{t('home.viewAll')}</Text>
-                </TouchableOpacity>
+              <View style={styles.sectionTitleRow}>
+                <View style={styles.sectionIconBadge}>
+                  <Ionicons name="location-outline" size={18} color={Colors.primary} />
+                </View>
+                <Text style={styles.sectionTitleText}>
+                  {t('home.recentNearbyReports') || 'Recent Nearby Issues'}
+                </Text>
               </View>
+              <TouchableOpacity
+                onPress={() => router.push('/complaints/nearby' as any)}
+                activeOpacity={0.7}
+                style={styles.viewAllPill}
+              >
+                <Text style={styles.viewAllText}>{t('home.viewAll') || 'View All'}</Text>
+                <Ionicons name="chevron-forward" size={14} color={Colors.primaryDark} />
+              </TouchableOpacity>
             </View>
 
             <View style={styles.reportsList}>
-              {loading ? (
+              {loading && !refreshing ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#2563EB" />
-                  <Text style={styles.loadingText}>{t('home.loadingNearbyReports')}</Text>
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                  <Text style={styles.loadingText}>
+                    {t('home.loadingNearbyReports') || 'Discovering issues in your locality...'}
+                  </Text>
                 </View>
               ) : nearbyReports.length > 0 ? (
                 nearbyReports.map((report) => {
@@ -339,87 +319,157 @@ export default function Home() {
                   return (
                     <TouchableOpacity
                       key={report.id}
-                      style={styles.reportItem}
+                      style={styles.reportCard}
+                      activeOpacity={0.85}
                       onPress={() => {
-                        // Navigate to nearby page and pass the report ID
                         router.push({
                           pathname: '/complaints/nearby',
-                          params: { selectedReportId: report.id }
+                          params: { selectedReportId: report.id },
                         } as any);
                       }}
                     >
-                      <View style={[styles.reportStatus, { backgroundColor: statusBgColor }]}>
-                        <Ionicons name={statusIcon} size={16} color={statusColor} />
+                      <View style={styles.reportCardHeader}>
+                        <View style={[styles.statusBadge, { backgroundColor: statusBgColor }]}>
+                          <Ionicons name={statusIcon} size={13} color={statusColor} />
+                          <Text style={[styles.statusText, { color: statusColor }]}>
+                            {statusText}
+                          </Text>
+                        </View>
+                        {report.distance !== undefined && (
+                          <View style={styles.distanceBadge}>
+                            <Ionicons name="navigate-outline" size={12} color="#0284C7" />
+                            <Text style={styles.distanceText}>
+                              {report.distance.toFixed(1)} km away
+                            </Text>
+                          </View>
+                        )}
                       </View>
-                      <View style={styles.reportContent}>
-                        <Text style={styles.reportTitle} numberOfLines={1}>{report.title}</Text>
-                        <Text style={styles.reportLocation} numberOfLines={1}>
-                          {formatTimeAgo(report.createdAt)}
-                          {report.distance && ` • ${report.distance.toFixed(1)}km away`}
-                        </Text>
-                      </View>
-                      <View style={[styles.statusBadge, { backgroundColor: statusBgColor }]}>
-                        <Text style={[styles.statusText, { color: statusColor }]}>{statusText}</Text>
+
+                      <Text style={styles.reportTitle} numberOfLines={2}>
+                        {report.title}
+                      </Text>
+
+                      <View style={styles.reportCardFooter}>
+                        <View style={styles.reportMetaItem}>
+                          <Ionicons name="time-outline" size={14} color={Colors.textMuted} />
+                          <Text style={styles.reportMetaText}>
+                            {formatTimeAgo(report.createdAt)}
+                          </Text>
+                        </View>
+
+                        <View style={styles.actionArrowPill}>
+                          <Text style={styles.actionArrowText}>Details</Text>
+                          <Ionicons name="arrow-forward" size={13} color={Colors.primaryDark} />
+                        </View>
                       </View>
                     </TouchableOpacity>
                   );
                 })
               ) : (
                 <View style={styles.emptyState}>
-                  <Ionicons name="location-outline" size={32} color="#CCCCCC" />
-                  <Text style={styles.emptyText}>{t('home.noNearbyReports')}</Text>
-                  <Text style={styles.emptySubtext}>{t('home.checkBackLater')}</Text>
+                  <View style={styles.emptyIconCircle}>
+                    <Ionicons name="shield-checkmark-outline" size={32} color={Colors.success} />
+                  </View>
+                  <Text style={styles.emptyText}>
+                    {t('home.noNearbyReports') || 'No Active Grievances Nearby'}
+                  </Text>
+                  <Text style={styles.emptySubtext}>
+                    {t('home.checkBackLater') || 'Your ward looks clear! You can report any new civic issue anytime.'}
+                  </Text>
+                  <TouchableOpacity
+                    style={styles.emptyReportButton}
+                    onPress={() => router.push('/(tabs)/Post' as any)}
+                  >
+                    <Ionicons name="add" size={16} color="#FFFFFF" />
+                    <Text style={styles.emptyReportButtonText}>File First Grievance</Text>
+                  </TouchableOpacity>
                 </View>
               )}
             </View>
           </View>
 
-          {/* Community Impact */}
+          {/* Community Impact Dashboard */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitle}>
-                <Text style={styles.sectionTitleText}>{t('home.communityImpact')}</Text>
+              <View style={styles.sectionTitleRow}>
+                <View style={[styles.sectionIconBadge, { backgroundColor: '#ECFDF5' }]}>
+                  <Ionicons name="bar-chart-outline" size={18} color={Colors.successDark} />
+                </View>
+                <Text style={styles.sectionTitleText}>
+                  {t('home.communityImpact') || 'Community Impact'}
+                </Text>
               </View>
             </View>
 
             <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
+              <View style={[styles.statCard, { borderTopColor: Colors.primary }]}>
+                <View style={[styles.statIconWrap, { backgroundColor: '#FFF7ED' }]}>
+                  <Ionicons name="file-tray-full-outline" size={18} color={Colors.primary} />
+                </View>
                 {statsLoading ? (
-                  <ActivityIndicator size="small" color="#3B82F6" />
+                  <ActivityIndicator size="small" color={Colors.primary} />
                 ) : (
-                  <Text style={styles.statNumber}>{(communityStats.reportsSubmitted || 0).toLocaleString()}</Text>
+                  <Text style={styles.statNumber}>
+                    {(communityStats.reportsSubmitted || 0).toLocaleString()}
+                  </Text>
                 )}
-                <Text style={styles.statLabel}>{t('home.reportsSubmitted')}</Text>
+                <Text style={styles.statLabel}>
+                  {t('home.reportsSubmitted') || 'Reports Filed'}
+                </Text>
               </View>
-              <View style={styles.statCard}>
+
+              <View style={[styles.statCard, { borderTopColor: Colors.success }]}>
+                <View style={[styles.statIconWrap, { backgroundColor: '#ECFDF5' }]}>
+                  <Ionicons name="checkmark-done-circle-outline" size={18} color={Colors.success} />
+                </View>
                 {statsLoading ? (
-                  <ActivityIndicator size="small" color="#059669" />
+                  <ActivityIndicator size="small" color={Colors.success} />
                 ) : (
-                  <Text style={styles.statNumber}>{(communityStats.issuesResolved || 0).toLocaleString()}</Text>
+                  <Text style={[styles.statNumber, { color: Colors.successDark }]}>
+                    {(communityStats.issuesResolved || 0).toLocaleString()}
+                  </Text>
                 )}
-                <Text style={styles.statLabel}>{t('home.issuesResolved')}</Text>
+                <Text style={styles.statLabel}>
+                  {t('home.issuesResolved') || 'Issues Resolved'}
+                </Text>
               </View>
-              <View style={styles.statCard}>
+
+              <View style={[styles.statCard, { borderTopColor: '#0284C7' }]}>
+                <View style={[styles.statIconWrap, { backgroundColor: '#F0F9FF' }]}>
+                  <Ionicons name="pie-chart-outline" size={18} color="#0284C7" />
+                </View>
                 {statsLoading ? (
-                  <ActivityIndicator size="small" color="#D97706" />
+                  <ActivityIndicator size="small" color="#0284C7" />
                 ) : (
-                  <Text style={styles.statNumber}>{communityStats.resolutionRate || '0%'}</Text>
+                  <Text style={[styles.statNumber, { color: '#0284C7' }]}>
+                    {communityStats.resolutionRate || '0%'}
+                  </Text>
                 )}
-                <Text style={styles.statLabel}>{t('home.resolutionRate')}</Text>
+                <Text style={styles.statLabel}>
+                  {t('home.resolutionRate') || 'Resolution Rate'}
+                </Text>
               </View>
-              <View style={styles.statCard}>
+
+              <View style={[styles.statCard, { borderTopColor: '#7C3AED' }]}>
+                <View style={[styles.statIconWrap, { backgroundColor: '#FAF5FF' }]}>
+                  <Ionicons name="flash-outline" size={18} color="#7C3AED" />
+                </View>
                 {statsLoading ? (
-                  <ActivityIndicator size="small" color="#DC2626" />
+                  <ActivityIndicator size="small" color="#7C3AED" />
                 ) : (
-                  <Text style={styles.statNumber}>{communityStats.avgResponseTime || '0.0'}</Text>
+                  <Text style={[styles.statNumber, { color: '#7C3AED' }]}>
+                    {communityStats.avgResponseTime || '2.4'}d
+                  </Text>
                 )}
-                <Text style={styles.statLabel}>{t('home.avgResponseTime')}</Text>
+                <Text style={styles.statLabel}>
+                  {t('home.avgResponseTime') || 'Avg Response Time'}
+                </Text>
               </View>
             </View>
           </View>
         </View>
       </ScrollView>
-      
+
       {/* Biometric Onboarding Modal */}
       <BiometricOnboarding
         visible={shouldShowOnboarding}
@@ -433,324 +483,269 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-    marginBottom: 50,
+    backgroundColor: '#FFFFFF',
   },
-  languageSwitcherContainer: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 1000,
+  topUtilityBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  appBrandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  logoBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: Radii.base,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Shadows.soft,
+  },
+  brandTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: Colors.text,
+    letterSpacing: 1.2,
+  },
+  brandSubtitle: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.textMuted,
   },
   scrollView: {
     flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    paddingBottom: 95,
   },
   content: {
     paddingHorizontal: Spacing.md,
-    paddingBottom: 24,
+    paddingTop: Spacing.md,
   },
   section: {
     marginBottom: Spacing.lg,
   },
   sectionHeader: {
-    marginBottom: 14,
-  },
-  sectionTitle: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: Spacing.sm,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  sectionIconBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: Radii.base,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionTitleText: {
-    fontSize: Typography.sizes.xl,
+    fontSize: Typography.sizes.md,
     fontWeight: '700',
     color: Colors.text,
   },
-  sectionSubtitle: {
-    fontSize: 16,
-    color: Colors.primary,
-    marginTop: 2,
-  },
-  newsCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radii.card,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 4,
-  },
-  newsTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 8,
-  },
-  newsExcerpt: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    lineHeight: 20,
-  },
-  servicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  serviceCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: Colors.surface,
-    borderRadius: Radii.card,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 4,
-    alignItems: 'center',
-  },
-  serviceTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  emergencySection: {
-    backgroundColor: Colors.surface,
-    borderRadius: Radii.card,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 4,
-    marginBottom: 20,
-  },
-  emergencyButton: {
+  viewAllPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#DC2626',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#DC2626',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  emergencyIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FEE2E2',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  emergencyText: {
-    flex: 1,
-  },
-  emergencyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  emergencySubtitle: {
-    fontSize: 14,
-    color: '#FEE2E2',
-  },
-  reportCategories: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  categoryCard: {
-    flex: 1,
-    minWidth: '35%',
-    borderRadius: Radii.card,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 3,
-    alignItems: 'center',
-  },
-  categoryIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  categoryDesc: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-  reportsList: {
-    marginBottom: 20,
-  },
-  reportItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surface,
-    borderRadius: Radii.card,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 3,
-  },
-  reportStatus: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  reportContent: {
-    flex: 1,
-  },
-  reportTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  reportLocation: {
-    fontSize: 12,
-    color: Colors.textMuted,
-  },
-  statusBadge: {
+    gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
+    borderRadius: Radii.pill,
+    backgroundColor: '#FFF7ED',
   },
   viewAllText: {
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '700',
     color: Colors.primaryDark,
+  },
+  reportsList: {
+    gap: 10,
+  },
+  reportCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radii.card,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    ...Shadows.card,
+  },
+  reportCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radii.pill,
+  },
+  statusText: {
+    fontSize: 11,
     fontWeight: '700',
   },
-  communityImpact: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
-    elevation: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-  },
-  impactGrid: {
+  distanceBadge: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  impactCard: {
-    flex: 1,
-    minWidth: '45%',
     alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#F0F9FF',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: Radii.pill,
   },
-  impactNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 4,
+  distanceText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0284C7',
   },
-  impactLabel: {
-    fontSize: 12,
-    color: '#666666',
-    textAlign: 'center',
+  reportTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.text,
+    lineHeight: 21,
+    marginBottom: 10,
   },
-  statsGrid: {
+  reportCardFooter: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#FFF7ED',
-    borderRadius: Radii.card,
-    padding: 16,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#FED7AA',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+    paddingTop: 8,
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Colors.primaryDark,
-    marginBottom: 4,
+  reportMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  statLabel: {
+  reportMetaText: {
     fontSize: 12,
     color: Colors.textMuted,
-    textAlign: 'center',
+  },
+  actionArrowPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  actionArrowText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.primaryDark,
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radii.card,
+    gap: 10,
   },
   loadingText: {
-    fontSize: 14,
-    color: '#666666',
-    marginLeft: 8,
+    fontSize: 13,
+    color: Colors.textMuted,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
-    backgroundColor: Colors.surface,
+    padding: 24,
+    backgroundColor: '#FFFFFF',
     borderRadius: Radii.card,
     borderWidth: 1,
-    borderColor: Colors.border,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 1,
-    shadowRadius: 18,
-    elevation: 3,
+    borderColor: '#E2E8F0',
+    ...Shadows.soft,
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: Colors.text,
-    marginTop: 12,
     textAlign: 'center',
+    marginBottom: 4,
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.textMuted,
-    marginTop: 4,
     textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  emptyReportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: Radii.pill,
+    ...Shadows.soft,
+  },
+  emptyReportButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 12,
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radii.card,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderTopWidth: 3,
+    ...Shadows.card,
+  },
+  statIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: Radii.base,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  statNumber: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textMuted,
   },
 });

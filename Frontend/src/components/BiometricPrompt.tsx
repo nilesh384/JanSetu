@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Modal,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -27,8 +28,8 @@ const BiometricPrompt: React.FC<BiometricPromptProps> = ({
   onFallback,
   onCancel,
   title = 'Welcome back',
-  subtitle = 'Use your biometric to unlock JanSetu',
-  biometricType = 'Fingerprint',
+  subtitle,
+  biometricType = Platform.OS === 'android' ? 'Fingerprint' : 'Face ID',
 }) => {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const { authenticateWithBiometric } = useAuth();
@@ -42,7 +43,6 @@ const BiometricPrompt: React.FC<BiometricPromptProps> = ({
       if (success) {
         onSuccess();
       } else {
-        // Authentication failed, but don't automatically fallback
         console.log('Biometric authentication failed');
       }
     } catch (error) {
@@ -55,13 +55,18 @@ const BiometricPrompt: React.FC<BiometricPromptProps> = ({
   const getIcon = () => {
     switch (biometricType) {
       case 'Face ID':
+      case 'Face Unlock':
         return 'scan-outline';
       case 'Iris':
         return 'eye-outline';
+      case 'Fingerprint':
+      case 'Touch ID':
       default:
         return 'finger-print-outline';
     }
   };
+
+  const defaultSubtitle = `Use your ${biometricType.toLowerCase()} to unlock JanSetu`;
 
   return (
     <Modal
@@ -81,12 +86,12 @@ const BiometricPrompt: React.FC<BiometricPromptProps> = ({
               />
             </View>
             <Text style={styles.title}>{title}</Text>
-            <Text style={styles.subtitle}>{subtitle}</Text>
+            <Text style={styles.subtitle}>{subtitle || defaultSubtitle}</Text>
           </View>
 
-          <View style={styles.buttonContainer}>
+          <View style={styles.actionsContainer}>
             <TouchableOpacity
-              style={[styles.biometricButton, isAuthenticating && styles.buttonDisabled]}
+              style={[styles.primaryButton, isAuthenticating && styles.buttonDisabled]}
               onPress={handleBiometricAuth}
               disabled={isAuthenticating}
             >
@@ -94,9 +99,9 @@ const BiometricPrompt: React.FC<BiometricPromptProps> = ({
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Ionicons name={getIcon()} size={24} color="#FFFFFF" />
-                  <Text style={styles.biometricButtonText}>
-                    Use {biometricType}
+                  <Ionicons name={getIcon()} size={20} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>
+                    Verify with {biometricType}
                   </Text>
                 </>
               )}
@@ -107,10 +112,7 @@ const BiometricPrompt: React.FC<BiometricPromptProps> = ({
               onPress={onFallback}
               disabled={isAuthenticating}
             >
-              <Ionicons name="keypad-outline" size={20} color="#FF6B35" />
-              <Text style={styles.fallbackButtonText}>
-                Use mobile number instead
-              </Text>
+              <Text style={styles.fallbackButtonText}>Use mobile number</Text>
             </TouchableOpacity>
 
             {onCancel && (
@@ -140,9 +142,9 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 30,
+    padding: 24,
     width: '100%',
-    maxWidth: 350,
+    maxWidth: 340,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
@@ -152,35 +154,37 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 24,
   },
   iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#FEF3F0',
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#FFF7ED',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#FED7AA',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#1F2937',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
   },
-  buttonContainer: {
+  actionsContainer: {
     width: '100%',
     gap: 12,
   },
-  biometricButton: {
+  primaryButton: {
     backgroundColor: '#FF6B35',
     borderRadius: 12,
     padding: 16,
@@ -192,33 +196,26 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.6,
   },
-  biometricButtonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
   fallbackButton: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  fallbackButtonText: {
-    color: '#FF6B35',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  cancelButton: {
     padding: 12,
     alignItems: 'center',
   },
+  fallbackButtonText: {
+    color: '#FF6B35',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    padding: 8,
+    alignItems: 'center',
+  },
   cancelButtonText: {
-    color: '#6B7280',
+    color: '#9CA3AF',
     fontSize: 14,
     fontWeight: '500',
   },

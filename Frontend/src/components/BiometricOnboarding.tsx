@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +20,7 @@ interface BiometricOnboardingProps {
 const BiometricOnboarding: React.FC<BiometricOnboardingProps> = ({
   visible,
   onComplete,
-  biometricType = 'Fingerprint',
+  biometricType = Platform.OS === 'android' ? 'Fingerprint' : 'Face ID',
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const { enableBiometric } = useAuth();
@@ -49,9 +50,12 @@ const BiometricOnboarding: React.FC<BiometricOnboardingProps> = ({
   const getIcon = () => {
     switch (biometricType) {
       case 'Face ID':
+      case 'Face Unlock':
         return 'scan-outline';
       case 'Iris':
         return 'eye-outline';
+      case 'Fingerprint':
+      case 'Touch ID':
       default:
         return 'finger-print-outline';
     }

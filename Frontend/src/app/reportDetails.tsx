@@ -1,16 +1,6 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Image,
-  TouchableOpacity,
-  Modal,
-  Dimensions,
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
-} from 'react-native';
+import { View, Text, ScrollView, Image, TouchableOpacity, Modal, Dimensions, ActivityIndicator, Alert } from 'react-native';
 import { getReportById } from '@/src/api/report';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -331,7 +321,7 @@ export default function ReportDetails() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <UniversalHeader title="Report Details" showBackButton={true} />
         <View style={styles.errorContainer}>
           <ActivityIndicator size="large" color="#FF6B35" />
@@ -343,7 +333,7 @@ export default function ReportDetails() {
 
   if (!report) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <UniversalHeader title="Report Details" showBackButton={true} />
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Report not found</Text>
@@ -355,7 +345,7 @@ export default function ReportDetails() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <UniversalHeader title="Report Details" showBackButton={true} />
 
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -653,7 +643,7 @@ export default function ReportDetails() {
           onRequestClose={() => setShowImageViewer(false)}
         >
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaView style={styles.imageViewerContainer}>
+            <SafeAreaView style={styles.imageViewerContainer} edges={['top']}>
               <View style={styles.imageViewerHeader}>
                 <TouchableOpacity
                   onPress={() => setShowImageViewer(false)}
@@ -732,7 +722,7 @@ export default function ReportDetails() {
             setVideoStatus(null);
           }}
         >
-          <SafeAreaView style={styles.videoPlayerContainer}>
+          <SafeAreaView style={styles.videoPlayerContainer} edges={['top']}>
             <View style={styles.videoPlayerHeader}>
               <TouchableOpacity
                 onPress={() => {

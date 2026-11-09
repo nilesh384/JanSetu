@@ -1,16 +1,9 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import UniversalHeader from '@/src/components/UniversalHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
-import {
-    Linking,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 export default function About() {
@@ -75,7 +68,7 @@ export default function About() {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <UniversalHeader title={t('profile.about')} />
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
